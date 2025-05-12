@@ -1,9 +1,20 @@
+import {
+  ShoppingCart,
+  UserCheck,
+  CurrencyDollar,
+  Receipt,
+} from "tabler-icons-react";
+
 export default function Stats() {
   const stats = [
-    { name: "Total Users", value: "1,234", icon: "users" },
-    { name: "Active Sessions", value: "56", icon: "activity" },
-    { name: "Total Revenue", value: "$12,345", icon: "currency-dollar" },
-    { name: "Growth Rate", value: "+12.5%", icon: "chart-line" },
+    { name: "Total Barang", value: "132", icon: <ShoppingCart /> }, // ShoppingCart for products
+    { name: "Absensi Pegawai", value: "3/4", icon: <UserCheck /> }, // UserCheck for employee attendance
+    {
+      name: "Omset Bulan Ini",
+      value: "Rp. 3.123.000",
+      icon: <CurrencyDollar />,
+    }, // CurrencyDollar for sales/revenue
+    { name: "Transaksi Hari Ini", value: "6", icon: <Receipt /> }, // Receipt for transactions
   ];
 
   return (
@@ -15,7 +26,7 @@ export default function Stats() {
         >
           <div className="flex items-center">
             <div className="w-12 h-12 rounded-full bg-gradient-to-b from-[#3F7F83] to-[#2B5658] flex items-center justify-center text-white">
-              <i className={`ti ti-${stat.icon} text-2xl`} />
+              {stat.icon}
             </div>
             <div className="ml-4">
               <p className="text-sm text-gray-500">{stat.name}</p>
