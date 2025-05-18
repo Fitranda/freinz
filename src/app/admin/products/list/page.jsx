@@ -1,37 +1,73 @@
+"use client";
+
+import { useEffect, useState, useMemo } from "react";
+import { fetchProducts } from "@/services/product/index";
+
 export default function Products() {
-  // Data for products
-  const products = [
-    {
-      code: "FRZ000196",
-      name: "TEMP GLASS IP 11",
-      stock: "17 Pcs",
-      price: "Rp 10.000",
-    },
-    {
-      code: "FRZ000195",
-      name: "TEMP GLASS IP 11 PRO MAX",
-      stock: "19 Pcs",
-      price: "Rp 10.000",
-    },
-    {
-      code: "FRZ000373",
-      name: "TG BLUE CLR IP 11",
-      stock: "15 Pcs",
-      price: "Rp 55.000",
-    },
-    {
-      code: "FRC02492",
-      name: "CASE PIC MATTE IP 11",
-      stock: "0 Pcs",
-      price: "Rp 35.000",
-    },
-    {
-      code: "FRZ000374",
-      name: "TG BLUE CLR IP 11 PRO",
-      stock: "5 Pcs",
-      price: "Rp 55.000",
-    },
-  ];
+  const [products, setProducts] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        const data = await fetchProducts();
+        setProducts(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error("Failed to fetch products:", error);
+      }
+    };
+    loadProducts();
+  }, []);
+
+  // Filter products by search term (case-insensitive)
+  const filteredProducts = useMemo(() => {
+    if (!searchTerm.trim()) return products;
+    return products.filter((product) =>
+      (product.productName ?? product.name ?? product.nama ?? "")
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase())
+    );
+  }, [products, searchTerm]);
+
+  // Calculate total pages for pagination
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredProducts.length / rowsPerPage)
+  );
+
+  // Ensure currentPage is valid when rowsPerPage or filteredProducts changes
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
+  // Paginate filtered products
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    return filteredProducts.slice(startIndex, startIndex + rowsPerPage);
+  }, [filteredProducts, currentPage, rowsPerPage]);
+
+  // Handlers
+  function handleSearchChange(e) {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1); // Reset to first page on search change
+  }
+
+  function handleRowsPerPageChange(e) {
+    setRowsPerPage(Number(e.target.value));
+    setCurrentPage(1); // Reset to first page on rows per page change
+  }
+
+  function goToPreviousPage() {
+    setCurrentPage((page) => Math.max(1, page - 1));
+  }
+
+  function goToNextPage() {
+    setCurrentPage((page) => Math.min(totalPages, page + 1));
+  }
 
   return (
     <div className="space-y-4">
@@ -40,20 +76,25 @@ export default function Products() {
       </div>
 
       <div className="flex justify-between items-center">
-        {/* Swapped Cari Barang and Rows position */}
         <div className="flex space-x-2 items-center">
           <input
             type="text"
+            value={searchTerm}
+            onChange={handleSearchChange}
             placeholder="Cari Barang..."
             className="w-[200px] px-4 py-2 border-2 text-gray-700 border-[#3F7F83] rounded-lg placeholder-gray-500"
           />
         </div>
 
         <div>
-          <select className="px-3 py-2 border-2 border-[#3F7F83] rounded-lg text-gray-700">
-            <option value="5">5 rows</option>
-            <option value="10">10 rows</option>
-            <option value="20">20 rows</option>
+          <select
+            value={rowsPerPage}
+            onChange={handleRowsPerPageChange}
+            className="px-3 py-2 border-2 border-[#3F7F83] rounded-lg text-gray-700"
+          >
+            <option value={5}>5 rows</option>
+            <option value={10}>10 rows</option>
+            <option value={20}>20 rows</option>
           </select>
         </div>
       </div>
@@ -69,32 +110,64 @@ export default function Products() {
             </tr>
           </thead>
           <tbody>
-            {products.map((product, index) => (
-              <tr
-                key={product.code}
-                className={`border-b ${
-                  index % 2 === 0 ? "bg-gray-50" : "bg-white"
-                } hover:bg-gray-100`}
-              >
-                <td className="px-4 py-2 text-gray-700 w-[120px]">
-                  {product.code}
-                </td>
-                <td className="px-4 py-2 text-gray-700">{product.name}</td>
-                <td className="px-4 py-2 text-center text-gray-700 whitespace-nowrap">
-                  {product.stock}
-                </td>
-                <td className="px-4 py-2 text-center text-gray-700 min-w-[180px] whitespace-nowrap">
-                  {product.price}
+            {paginatedProducts.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-4 py-4 text-center text-gray-500">
+                  Tidak ada data barang ditemukan
                 </td>
               </tr>
-            ))}
+            ) : (
+              paginatedProducts.map((product, index) => (
+                <tr
+                  key={product.productId ?? index} // Prefer productId for key
+                  className={`border-b ${
+                    index % 2 === 0 ? "bg-gray-50" : "bg-white"
+                  } hover:bg-gray-100`}
+                >
+                  <td className="px-4 py-2 text-gray-700 w-[120px]">
+                    {product.productId}
+                  </td>
+                  <td className="px-4 py-2 text-gray-700">
+                    {product.productName ?? product.name ?? product.nama}
+                  </td>
+                  <td className="px-4 py-2 text-center text-gray-700 whitespace-nowrap">
+                    {product.stock ?? 0} Pcs
+                  </td>
+                  <td className="px-4 py-2 text-center text-gray-700 min-w-[180px] whitespace-nowrap">
+                    Rp {Number(product.price ?? 0).toLocaleString("id-ID")}
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
+
         <div className="flex justify-between items-center px-2">
-          <button className="px-4 py-2 bg-[#3F7F83] text-white rounded-lg hover:bg-[#4F969A] transition">
+          <button
+            onClick={goToPreviousPage}
+            disabled={currentPage === 1}
+            className={`px-4 py-2 rounded-lg text-white transition ${
+              currentPage === 1
+                ? "bg-gray-300 cursor-not-allowed"
+                : "bg-[#3F7F83] hover:bg-[#4F969A]"
+            }`}
+          >
             Previous
           </button>
-          <button className="px-4 py-2 bg-[#3F7F83] text-white rounded-lg hover:bg-[#4F969A] transition">
+
+          <div className="text-gray-700">
+            Halaman {currentPage} dari {totalPages}
+          </div>
+
+          <button
+            onClick={goToNextPage}
+            disabled={currentPage === totalPages}
+            className={`px-4 py-2 rounded-lg text-white transition ${
+              currentPage === totalPages
+                ? "bg-gray-300 cursor-not-allowed"
+                : "bg-[#3F7F83] hover:bg-[#4F969A]"
+            }`}
+          >
             Next
           </button>
         </div>

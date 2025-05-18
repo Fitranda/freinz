@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Plus,
   Database,
@@ -7,14 +9,18 @@ import {
   Package,
 } from "tabler-icons-react";
 
+import { useSelector } from "react-redux";
 import Stats from "@/components/dashboard/Stats";
 
 export default function Dashboard() {
+  const employee = useSelector((state) => state.auth.user);
   return (
     <div className="space-y-8">
       <div className="font-poppins">
         <h1 className="text-3xl font-bold text-[#2B5658]">Dashboard</h1>
-        <p className="text-gray-600 mt-2">Selamat Datang Kembali, Fitranda</p>
+        <p className="text-gray-600 mt-2">
+          Selamat Datang Kembali, {employee?.employeeName || "Guest"}
+        </p>
       </div>
 
       <Stats />

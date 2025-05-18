@@ -1,6 +1,8 @@
 "use client";
+
 import Link from "next/link";
-import { useState } from "react";
+import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
 
 const navigation = [
   { name: "Dashboard", icon: "home", href: "/employee/dashboard" },
@@ -28,13 +30,37 @@ const navigation = [
 ];
 
 export default function Sidebar({ isOpen }) {
-  const [openMenus, setOpenMenus] = useState({});
+  const pathname = usePathname();
 
-  const toggleMenu = (name) => {
-    setOpenMenus((prev) => ({
-      ...prev,
-      [name]: !prev[name],
-    }));
+  // State to keep track which menu is open — only one open at a time
+  const [openMenu, setOpenMenu] = useState(null);
+
+  // On mount and on pathname change, open submenu if current path is inside
+  useEffect(() => {
+    const activeParent = navigation.find((item) =>
+      item.children?.some((child) => pathname.startsWith(child.href))
+    );
+    if (activeParent) {
+      setOpenMenu(activeParent.name);
+    } else {
+      setOpenMenu(null);
+    }
+  }, [pathname]);
+
+  // Helper to check if parent item is active
+  const isParentActive = (item) => {
+    if (item.href && pathname === item.href) return true;
+    if (item.children) {
+      return item.children.some((child) => pathname === child.href);
+    }
+    return false;
+  };
+
+  // Helper to check if child is active
+  const isChildActive = (href) => pathname === href;
+
+  const handleToggleMenu = (name) => {
+    setOpenMenu((prev) => (prev === name ? null : name));
   };
 
   return (
@@ -59,7 +85,11 @@ export default function Sidebar({ isOpen }) {
                 {!item.children ? (
                   <Link
                     href={item.href}
-                    className="flex items-center px-4 py-3 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                    className={`flex items-center px-4 py-3 rounded-lg transition-colors ${
+                      isParentActive(item)
+                        ? "bg-gray-100 text-gray-800"
+                        : "text-gray-600 hover:bg-gray-100"
+                    }`}
                   >
                     <i className={`ti ti-${item.icon} text-xl mr-3`} />
                     <span className="font-medium">{item.name}</span>
@@ -67,8 +97,12 @@ export default function Sidebar({ isOpen }) {
                 ) : (
                   <div>
                     <button
-                      onClick={() => toggleMenu(item.name)}
-                      className="flex items-center w-full px-4 py-3 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                      onClick={() => handleToggleMenu(item.name)}
+                      className={`flex items-center w-full px-4 py-3 rounded-lg transition-colors ${
+                        isParentActive(item)
+                          ? "bg-gray-100 text-gray-800"
+                          : "text-gray-600 hover:bg-gray-100"
+                      }`}
                     >
                       <i className={`ti ti-${item.icon} text-xl mr-3`} />
                       <span className="font-medium flex-1 text-left">
@@ -76,20 +110,24 @@ export default function Sidebar({ isOpen }) {
                       </span>
                       <i
                         className={`ti ${
-                          openMenus[item.name]
+                          openMenu === item.name
                             ? "ti-chevron-up"
                             : "ti-chevron-down"
                         } text-sm`}
                       />
                     </button>
 
-                    {openMenus[item.name] && (
-                      <ul className="pl-11 mt-1 space-y-1 text-sm text-gray-600">
+                    {openMenu === item.name && (
+                      <ul className="pl-11 mt-1 space-y-1 text-sm">
                         {item.children.map((sub) => (
                           <li key={sub.name}>
                             <Link
                               href={sub.href}
-                              className="block py-2 px-3 rounded-lg hover:bg-gray-100"
+                              className={`block py-2 px-3 rounded-lg transition-colors ${
+                                isChildActive(sub.href)
+                                  ? "bg-gray-100 text-gray-800"
+                                  : "text-gray-600 hover:bg-gray-100"
+                              }`}
                             >
                               {sub.name}
                             </Link>
@@ -108,6 +146,13 @@ export default function Sidebar({ isOpen }) {
           <Link
             href="/login"
             className="flex items-center w-full px-4 py-3 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+            onClick={() => {
+              // Optional: clear localStorage and reset redux here if you want
+              if (typeof window !== "undefined") {
+                localStorage.removeItem("token");
+                // You can dispatch your redux reset action here if you want
+              }
+            }}
           >
             <i className="ti ti-logout text-xl mr-3" />
             <span className="font-medium">Logout</span>
