@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({ username: "", password: "" });
+  const [loading, setLoading] = useState(false);
 
   const dispatch = useDispatch();
   const router = useRouter();
@@ -20,6 +21,8 @@ export default function LoginPage() {
       toast.error("Username dan kata sandi harus diisi.");
       return;
     }
+
+    setLoading(true); // Mulai loading
 
     try {
       const data = await login({
@@ -36,6 +39,8 @@ export default function LoginPage() {
       toast.error(
         "Login gagal: " + (error?.response?.data?.message || error.message)
       );
+    }finally {
+      setLoading(false); // Selesai loading
     }
   };
 
