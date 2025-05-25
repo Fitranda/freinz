@@ -1,361 +1,443 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { fetchProducts } from "@/services/product";
+import { createSale } from "@/services/sale";
+import { fetchEmployeeById } from "@/services/employee";
+import toast from "react-hot-toast";
+
 export default function KeranjangPenjualan() {
-  // Sample search results data
-  const searchResults = [
-    { id: 1, name: "TEMP GLASS IP 11", stock: 15, price: 10000 },
-    { id: 2, name: "TEMP GLASS IP 11 PRO MAX", stock: 8, price: 10000 },
-    { id: 3, name: "TG BLUE CLR IP 11", stock: 12, price: 55000 },
-    { id: 4, name: "CASE PIC MATTE IP 11", stock: 20, price: 35000 },
-  ];
+  const [allProducts, setAllProducts] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchInput, setSearchInput] = useState("");
+  const [cartItems, setCartItems] = useState([]);
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [discountPercentage, setDiscountPercentage] = useState(0);
+  const [payment, setPayment] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentEmployee, setCurrentEmployee] = useState(null);
 
-  // Sample cart data
-  const cartItems = [
-    {
-      id: 1,
-      name: "TEMP GLASS IP 11",
-      quantity: 2,
-      price: 10000,
-      total: 20000,
-    },
-    {
-      id: 2,
-      name: "CASE PIC MATTE IP 11",
-      quantity: 1,
-      price: 35000,
-      total: 35000,
-    },
-  ];
+  useEffect(() => {
+    async function loadData() {
+      try {
+        // Load products
+        const products = await fetchProducts();
+        setAllProducts(products);
 
-  // Calculate totals
+        // Load current employee dari token
+        const token = localStorage.getItem("token");
+        if (token) {
+          const employee = await fetchEmployeeById(token);
+          setCurrentEmployee(employee);
+        }
+      } catch (error) {
+        console.error("Error loading data:", error);
+        toast.error("Gagal memuat data");
+      }
+    }
+    loadData();
+  }, []);
+
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchInput(value);
+
+    if (!value.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    const filtered = allProducts.filter(
+      (p) =>
+        p.productName &&
+        p.productName.toLowerCase().includes(value.toLowerCase())
+    );
+    setSearchResults(filtered);
+  };
+
+  const handleAddToCart = (product) => {
+    setCartItems((prev) => {
+      const exists = prev.find((item) => item.id === product.productId);
+      if (exists) {
+        return prev.map((item) =>
+          item.id === product.productId
+            ? {
+                ...item,
+                quantity: item.quantity + 1,
+                total: (item.quantity + 1) * item.price,
+              }
+            : item
+        );
+      }
+      return [
+        ...prev,
+        {
+          id: product.productId,
+          name: product.productName,
+          quantity: 1,
+          price: product.price,
+          total: product.price,
+        },
+      ];
+    });
+  };
+
+  const handleRemoveFromCart = (id) => {
+    setCartItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleResetCart = () => {
+    setCartItems([]);
+    setDiscountPercentage(0);
+    setPayment(0);
+  };
+
   const subTotal = cartItems.reduce((sum, item) => sum + item.total, 0);
-  const discountPercentage = 10;
-  const discountAmount = (subTotal * discountPercentage) / 100;
+  const validDiscountPercentage = Math.max(
+    0,
+    Math.min(100, discountPercentage)
+  );
+  const discountAmount = (subTotal * validDiscountPercentage) / 100;
   const totalAfterDiscount = subTotal - discountAmount;
-  const payment = 100000;
-  const change = payment - totalAfterDiscount;
+  const change =
+    payment >= totalAfterDiscount ? payment - totalAfterDiscount : 0;
+
+  const handleDiscountChange = (e) => {
+    const value = e.target.value;
+    const num = Number(value);
+    if (!isNaN(num)) {
+      setDiscountPercentage(num);
+    }
+  };
+
+  const handlePaymentChange = (e) => {
+    const value = e.target.value;
+    const num = Number(value);
+    if (!isNaN(num)) {
+      setPayment(num);
+    }
+  };
+
+  // Generate invoice number
+  const generateInvoice = () => {
+    const now = new Date();
+    const timestamp =
+      now.getFullYear().toString() +
+      (now.getMonth() + 1).toString().padStart(2, "0") +
+      now.getDate().toString().padStart(2, "0") +
+      now.getHours().toString().padStart(2, "0") +
+      now.getMinutes().toString().padStart(2, "0");
+    return `INV${timestamp}`;
+  };
+
+  // Handle submit transaksi
+  const handleSubmitSale = async () => {
+    // Validasi basic
+    if (cartItems.length === 0) {
+      toast.error("Keranjang masih kosong!");
+      return;
+    }
+
+    if (!currentEmployee) {
+      toast.error("Data employee tidak ditemukan!");
+      return;
+    }
+
+    if (payment < totalAfterDiscount) {
+      toast.error("Pembayaran kurang!");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Format data sesuai API
+      const saleData = {
+        invoice: generateInvoice(),
+        employeeId: currentEmployee.employeeId,
+        date: new Date().toISOString().split("T")[0], // YYYY-MM-DD format
+        method: paymentMethod,
+        subtotal: subTotal,
+        discountPercent: validDiscountPercentage,
+        total: totalAfterDiscount,
+        payment: payment,
+        change: change,
+        details: cartItems.map((item) => ({
+          productId: item.id,
+          quantity: item.quantity,
+          price: item.price,
+          subtotal: item.total,
+        })),
+      };
+
+      console.log("Sending sale data:", saleData);
+
+      const result = await createSale(saleData);
+
+      if (result) {
+        toast.success("Transaksi berhasil disimpan!");
+        console.log("Sale created:", result);
+
+        // Reset form setelah berhasil
+        handleResetCart();
+        setSearchInput("");
+        setSearchResults([]);
+
+        // Optional: redirect atau print receipt
+        // router.push(`/receipt/${result.id}`);
+      } else {
+        throw new Error("Gagal menyimpan transaksi");
+      }
+    } catch (error) {
+      console.error("Submit error:", error);
+      toast.error("Gagal menyimpan transaksi: " + error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    <div className="space-y-4">
-      <div className="bg-gray-100 py-2 px-4">
-        <h1 className="text-xl text-gray-600 font-medium">
-          Transaksi Penjualan
-        </h1>
+    <div className="space-y-4 p-4 bg-white text-gray-800">
+      <div className="bg-gray-100 py-2 px-4 rounded">
+        <h1 className="text-xl font-semibold">Transaksi Penjualan</h1>
+        {currentEmployee && (
+          <p className="text-sm text-gray-600">
+            Kasir: {currentEmployee.employeeName}
+          </p>
+        )}
       </div>
 
-      {/* Combined search and results in a single container */}
-      <div className="border rounded shadow">
-        <div className="bg-[#3F7F83] text-white py-3 px-4 flex items-center">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5 mr-2"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fillRule="evenodd"
-              d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-              clipRule="evenodd"
-            />
-          </svg>
-          <span className="font-medium">Cari Barang</span>
+      <div className="border rounded shadow bg-white">
+        <div className="bg-[#3F7F83] text-white py-3 px-4 rounded-t">
+          <span className="font-semibold">Cari Barang</span>
         </div>
-
         <div className="p-4 space-y-4">
-          {/* Search input */}
+          <input
+            type="text"
+            placeholder="Masukan : Kode / Nama Barang [ENTER]"
+            className="w-full px-4 py-2 border border-gray-300 rounded text-gray-800 placeholder-gray-500"
+            value={searchInput}
+            onChange={handleSearchChange}
+          />
           <div>
-            <input
-              type="text"
-              placeholder="Masukan : Kode / Nama Barang [ENTER]"
-              className="w-full px-4 py-2 border border-gray-300 rounded text-gray-700"
-            />
-          </div>
-
-          {/* Search results */}
-          <div>
-            <div className="border-b border-gray-300 pb-2 mb-2">
-              <h2 className="font-medium text-gray-700 flex items-center">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 mr-2"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                Hasil Pencarian
-              </h2>
-            </div>
-            <table className="w-full border border-gray-300">
+            <h2 className="font-semibold mb-2">Hasil Pencarian</h2>
+            <table className="w-full border border-gray-300 text-sm">
               <thead>
-                <tr className="bg-gray-100 border-b border-gray-300">
-                  <th className="px-4 py-2 w-full text-left text-gray-700 font-medium whitespace-nowrap">
-                    Nama Barang
-                  </th>
-                  <th className="px-4 py-2 text-center text-gray-700 font-medium whitespace-nowrap">
-                    Stok
-                  </th>
-                  <th className="px-4 py-2 text-center text-gray-700 font-medium whitespace-nowrap">
-                    Harga Jual Satuan
-                  </th>
-                  <th className="px-4 py-2 text-center text-gray-700 font-medium whitespace-nowrap">
-                    Action
-                  </th>
+                <tr className="bg-gray-100 text-gray-800">
+                  <th className="px-4 py-2 text-left">Nama Barang</th>
+                  <th className="px-4 py-2 text-center">Stok</th>
+                  <th className="px-4 py-2 text-center">Harga</th>
+                  <th className="px-4 py-2 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody>
-                {searchResults.map((item) => (
-                  <tr
-                    key={item.id}
-                    className="border-b border-gray-300 hover:bg-gray-50"
-                  >
-                    <td className="px-4 py-2 text-gray-700 whitespace-nowrap">
-                      {item.name}
-                    </td>
-                    <td className="px-4 py-2 text-center text-gray-700 whitespace-nowrap">
-                      {item.stock}
-                    </td>
-                    <td className="px-4 py-2 text-center text-gray-700 whitespace-nowrap">
-                      Rp {item.price.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-2 text-center whitespace-nowrap">
-                      <button className="bg-green-600 text-white px-2 py-1 rounded text-sm flex items-center mx-auto">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-4 w-4 mr-1"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                        Tambah
-                      </button>
+                {searchResults.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="text-center p-4 text-gray-500">
+                      Tidak ada hasil pencarian
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  searchResults.map((item) => (
+                    <tr key={item.productId} className="hover:bg-gray-50">
+                      <td className="px-4 py-2">{item.productName}</td>
+                      <td className="px-4 py-2 text-center">{item.stock}</td>
+                      <td className="px-4 py-2 text-center">
+                        Rp {item.price.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-2 text-center">
+                        <button
+                          onClick={() => handleAddToCart(item)}
+                          className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs"
+                        >
+                          Tambah
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         </div>
       </div>
 
-      {/* Cashier section */}
-      <div className="border rounded shadow">
-        <div className="bg-[#3F7F83] text-white py-3 px-4 flex items-center justify-between">
-          <div className="flex items-center">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5 mr-2"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
-            </svg>
-            <span className="font-bold">KASIR</span>
-          </div>
-          <button className="bg-red-600 text-white px-4 py-1 rounded font-medium">
+      <div className="border rounded shadow bg-white">
+        <div className="bg-[#3F7F83] text-white py-3 px-4 flex justify-between items-center rounded-t">
+          <span className="font-bold text-lg">KASIR</span>
+          <button
+            onClick={handleResetCart}
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-1 rounded font-medium"
+          >
             RESET KERANJANG
           </button>
         </div>
 
         <div className="p-4">
-          {/* Date section */}
-          <div className="flex mb-4">
-            <div className="w-1/6 border border-gray-300 p-2 bg-gray-50 font-medium text-gray-700">
-              <label>Tanggal</label>
-            </div>
-            <div className="flex-1 border border-gray-300 bg-gray-100 p-2 text-gray-700">
-              <span>12 December 2022, 9:26</span>
-            </div>
-          </div>
-
-          {/* Table section */}
-          <div className="mb-4">
-            <div className="flex items-center mb-2 text-gray-700">
-              <div>
-                <span>Show </span>
-                <select className="border border-gray-300 px-2 py-1 rounded">
-                  <option>10</option>
-                  <option>25</option>
-                  <option>50</option>
-                </select>
-                <span> entries</span>
-              </div>
-              <div className="ml-auto">
-                <span>Search: </span>
-                <input
-                  type="text"
-                  className="border border-gray-300 px-2 py-1 rounded"
-                />
-              </div>
-            </div>
-
-            <table className="w-full border border-gray-300">
-              <thead>
-                <tr className="bg-gray-100 border-b border-gray-300">
-                  <th className="p-2 text-left border-r border-gray-300 text-gray-700 font-medium">
-                    No
-                  </th>
-                  <th className="p-2 text-left border-r border-gray-300 text-gray-700 font-medium">
-                    Nama Barang
-                  </th>
-                  <th className="p-2 text-left border-r border-gray-300 text-gray-700 font-medium">
-                    Jumlah
-                  </th>
-                  <th className="p-2 text-left border-r border-gray-300 text-gray-700 font-medium">
-                    Total
-                  </th>
-                  <th className="p-2 text-left text-gray-700 font-medium">
-                    Aksi
-                  </th>
+          <table className="w-full border border-gray-300 text-sm mb-4">
+            <thead>
+              <tr className="bg-gray-100 text-gray-800">
+                <th className="p-2 border-r">No</th>
+                <th className="p-2 border-r">Nama Barang</th>
+                <th className="p-2 border-r">Jumlah</th>
+                <th className="p-2 border-r">Total</th>
+                <th className="p-2">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cartItems.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="text-center p-4 text-gray-500 italic font-light"
+                  >
+                    Keranjang kosong
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {cartItems.map((item, index) => (
+              ) : (
+                cartItems.map((item, index) => (
                   <tr
                     key={item.id}
-                    className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}
+                    className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
                   >
-                    <td className="p-2 text-gray-700 border-r border-gray-300">
-                      {index + 1}
-                    </td>
-                    <td className="p-2 text-gray-700 border-r border-gray-300">
-                      {item.name}
-                    </td>
-                    <td className="p-2 text-gray-700 border-r border-gray-300 text-center">
+                    <td className="p-2 border-r text-center">{index + 1}</td>
+                    <td className="p-2 border-r">{item.name}</td>
+                    <td className="p-2 border-r text-center">
                       {item.quantity}
                     </td>
-                    <td className="p-2 text-gray-700 border-r border-gray-300 text-center">
+                    <td className="p-2 border-r text-center">
                       Rp {item.total.toLocaleString()}
                     </td>
                     <td className="p-2 text-center">
-                      <div className="flex justify-center space-x-2">
-                        <button className="bg-[#3F7F83] text-white px-2 py-1 rounded text-xs">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-4 w-4"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                          </svg>
-                        </button>
-                        <button className="bg-red-600 text-white px-2 py-1 rounded text-xs">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-4 w-4"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => handleRemoveFromCart(item.id)}
+                        className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs"
+                      >
+                        Hapus
+                      </button>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                ))
+              )}
+            </tbody>
+          </table>
 
-            <div className="flex justify-between items-center mt-2 text-gray-700">
-              <div>
-                Showing 1 to {cartItems.length} of {cartItems.length} entries
+          <div className="mb-4">
+            <label className="font-semibold mr-4">Metode Pembayaran:</label>
+            <label className="mr-4">
+              <input
+                type="radio"
+                name="paymentMethod"
+                value="cash"
+                checked={paymentMethod === "cash"}
+                onChange={() => setPaymentMethod("cash")}
+                className="mr-1"
+              />
+              Cash
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="paymentMethod"
+                value="qris"
+                checked={paymentMethod === "qris"}
+                onChange={() => setPaymentMethod("qris")}
+                className="mr-1"
+              />
+              QRIS
+            </label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+            <div>
+              <div className="mb-2 flex items-center">
+                <label className="w-1/3">Discount (%)</label>
+                <input
+                  type="number"
+                  value={discountPercentage}
+                  onChange={handleDiscountChange}
+                  min={0}
+                  max={100}
+                  className="flex-1 border border-gray-300 p-2"
+                />
               </div>
-              <div>
-                <button className="px-3 py-1 bg-gray-200 text-gray-700 rounded mr-1 border border-gray-300">
-                  Previous
-                </button>
-                <button className="px-3 py-1 bg-gray-200 text-gray-700 rounded border border-gray-300">
-                  Next
-                </button>
+              <div className="mb-2 flex items-center">
+                <label className="w-1/3">Sub Total</label>
+                <input
+                  type="text"
+                  value={`Rp ${subTotal.toLocaleString()}`}
+                  readOnly
+                  className="flex-1 border border-gray-300 p-2 bg-gray-100 text-gray-800"
+                />
+              </div>
+              <div className="mb-2 flex items-center">
+                <label className="w-1/3">Total Semua</label>
+                <input
+                  type="text"
+                  value={`Rp ${totalAfterDiscount.toLocaleString()}`}
+                  readOnly
+                  className="flex-1 border border-gray-300 p-2 bg-gray-100 text-gray-800 font-bold"
+                />
+              </div>
+            </div>
+            <div>
+              <div className="mb-2 flex items-center">
+                <label className="w-1/3">Bayar</label>
+                <input
+                  type="number"
+                  value={payment}
+                  onChange={handlePaymentChange}
+                  min={0}
+                  className="flex-1 border border-gray-300 p-2"
+                />
+              </div>
+              <div className="mb-2 flex items-center">
+                <label className="w-1/3">Kembali</label>
+                <input
+                  type="text"
+                  value={`Rp ${change.toLocaleString()}`}
+                  readOnly
+                  className="flex-1 border border-gray-300 p-2 bg-gray-100 text-gray-800"
+                />
               </div>
             </div>
           </div>
 
-          {/* Payment section */}
-          <div className="flex">
-            <div className="w-1/2 pr-2">
-              <div className="flex mb-2">
-                <div className="w-1/4 p-2 border border-gray-300 bg-gray-50 text-gray-700 font-medium">
-                  <label>Discount (%)</label>
-                </div>
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    value={discountPercentage}
-                    readOnly
-                    className="w-full border border-gray-300 p-2 text-gray-700"
-                  />
-                </div>
-              </div>
-              <div className="flex mb-2">
-                <div className="w-1/4 p-2 border border-gray-300 bg-gray-50 text-gray-700 font-medium">
-                  <label>Total Semua</label>
-                </div>
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    value={`Rp ${totalAfterDiscount.toLocaleString()}`}
-                    readOnly
-                    className="w-full border border-gray-300 p-2 text-gray-700"
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="w-1/2 pl-2">
-              {/* Row 1: Bayar */}
-              <div className="flex mb-2">
-                <div className="w-1/4 p-2 border border-gray-300 bg-gray-50 text-gray-700 font-medium">
-                  <label>Bayar</label>
-                </div>
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    value={`Rp ${payment.toLocaleString()}`}
-                    readOnly
-                    className="w-full border border-gray-300 p-2 text-gray-700"
-                  />
-                </div>
-              </div>
+          {/* Submit Button */}
+          <div className="flex justify-end space-x-2">
+            <button
+              onClick={handleSubmitSale}
+              disabled={
+                isSubmitting ||
+                cartItems.length === 0 ||
+                payment < totalAfterDiscount
+              }
+              className={`px-6 py-3 rounded font-semibold text-white ${
+                isSubmitting ||
+                cartItems.length === 0 ||
+                payment < totalAfterDiscount
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-green-600 hover:bg-green-700"
+              }`}
+            >
+              {isSubmitting ? "Menyimpan..." : "SIMPAN TRANSAKSI"}
+            </button>
+          </div>
 
-              {/* Row 2: Kembali + Bayar Button */}
-              <div className="flex mb-2 items-center">
-                <div className="w-1/4 p-2 border border-gray-300 bg-gray-50 text-gray-700 font-medium">
-                  <label>Kembali</label>
-                </div>
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    value={`Rp ${change.toLocaleString()}`}
-                    className="w-full border border-gray-300 p-2 text-gray-700"
-                    readOnly
-                  />
-                </div>
-                <div className="ml-2">
-                  <button className="bg-green-600 text-white p-2 rounded flex items-center font-medium">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5 mr-1"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
-                    </svg>
-                    Bayar
-                  </button>
-                </div>
-              </div>
-            </div>
+          {/* Status indicators */}
+          <div className="mt-2 text-sm">
+            {cartItems.length === 0 && (
+              <p className="text-red-500">• Tambahkan produk ke keranjang</p>
+            )}
+            {payment < totalAfterDiscount && payment > 0 && (
+              <p className="text-red-500">
+                • Pembayaran kurang Rp{" "}
+                {(totalAfterDiscount - payment).toLocaleString()}
+              </p>
+            )}
+            {payment >= totalAfterDiscount && cartItems.length > 0 && (
+              <p className="text-green-600">• Siap untuk disimpan</p>
+            )}
           </div>
         </div>
       </div>

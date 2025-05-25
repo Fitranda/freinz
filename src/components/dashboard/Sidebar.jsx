@@ -3,51 +3,97 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-
-const navigation = [
-  { name: "Dashboard", icon: "home", href: "/employee/dashboard" },
-  {
-    name: "Absensi",
-    icon: "users",
-    href: "/employee/attendance/list",
-  },
-  {
-    name: "Barang",
-    icon: "report",
-    children: [
-      { name: "Data Barang", href: "/employee/products/list" },
-      { name: "Pesan Barang", href: "/employee/products/order/list" },
-    ],
-  },
-  {
-    name: "Transaksi",
-    icon: "settings",
-    children: [
-      { name: "Data Penjualan", href: "/employee/transactions/list" },
-      { name: "Tambah Transaksi", href: "/employee/transactions/sales" },
-    ],
-  },
-];
+import { fetchEmployeeById } from "@/services/employee";
 
 export default function Sidebar({ isOpen }) {
   const pathname = usePathname();
-
-  // State to keep track which menu is open — only one open at a time
+  const [role, setRole] = useState(null);
   const [openMenu, setOpenMenu] = useState(null);
 
-  // On mount and on pathname change, open submenu if current path is inside
+  const navigationByRole = {
+    Employee: [
+      { name: "Dashboard", icon: "home", href: "/employee/dashboard" },
+      { name: "Absensi", icon: "users", href: "/employee/attendance/list" },
+      {
+        name: "Barang",
+        icon: "report",
+        children: [
+          { name: "Data Barang", href: "/employee/products/list" },
+          { name: "Pesan Barang", href: "/employee/products/order/list" },
+        ],
+      },
+      {
+        name: "Transaksi",
+        icon: "settings",
+        children: [
+          { name: "Data Penjualan", href: "/employee/transactions/list" },
+          { name: "Tambah Transaksi", href: "/employee/transactions/sales" },
+        ],
+      },
+    ],
+    Admin: [
+      { name: "Dashboard", icon: "home", href: "/admin/dashboard" },
+      {
+        name: "Barang",
+        icon: "report",
+        children: [
+          { name: "Data Barang", href: "/admin/products/list" },
+          { name: "Pesan Barang", href: "/admin/products/order/list" },
+        ],
+      },
+      { name: "Transaksi", icon: "settings", href: "/admin/transactions/list" },
+      {
+        name: "Supplier",
+        icon: "building-store",
+        href: "/admin/suppliers/list",
+      },
+    ],
+    supervisor: [
+      { name: "Dashboard", icon: "home", href: "/supervisor/dashboard" },
+      {
+        name: "Barang",
+        icon: "report",
+        children: [
+          { name: "Data Barang", href: "/supervisor/products/list" },
+          { name: "Pesan Barang", href: "/supervisor/products/order/list" },
+        ],
+      },
+      {
+        name: "Transaksi",
+        icon: "settings",
+        href: "/supervisor/transactions/list",
+      },
+      { name: "Absensi", icon: "users", href: "/supervisor/attendance/list" },
+      {
+        name: "Data Karyawan",
+        icon: "user",
+        href: "/supervisor/employees/list",
+      },
+    ],
+  };
+
   useEffect(() => {
-    const activeParent = navigation.find((item) =>
+    const fetchRole = async () => {
+      const token = localStorage.getItem("token");
+      if (token) {
+        const employee = await fetchEmployeeById(token);
+        console.log("data: ", employee);
+        setRole(employee?.role);
+      }
+    };
+    fetchRole();
+  }, []);
+
+  useEffect(() => {
+    const navItems = navigationByRole[role] || [];
+    const activeParent = navItems.find((item) =>
       item.children?.some((child) => pathname.startsWith(child.href))
     );
-    if (activeParent) {
-      setOpenMenu(activeParent.name);
-    } else {
-      setOpenMenu(null);
-    }
-  }, [pathname]);
+    setOpenMenu(activeParent?.name || null);
+  }, [pathname, role]);
 
-  // Helper to check if parent item is active
+  const navigation = navigationByRole[role] || [];
+
   const isParentActive = (item) => {
     if (item.href && pathname === item.href) return true;
     if (item.children) {
@@ -56,12 +102,13 @@ export default function Sidebar({ isOpen }) {
     return false;
   };
 
-  // Helper to check if child is active
   const isChildActive = (href) => pathname === href;
 
   const handleToggleMenu = (name) => {
     setOpenMenu((prev) => (prev === name ? null : name));
   };
+
+  if (!role) return null; // Bisa diganti dengan loading spinner
 
   return (
     <aside
@@ -147,11 +194,7 @@ export default function Sidebar({ isOpen }) {
             href="/login"
             className="flex items-center w-full px-4 py-3 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
             onClick={() => {
-              // Optional: clear localStorage and reset redux here if you want
-              if (typeof window !== "undefined") {
-                localStorage.removeItem("token");
-                // You can dispatch your redux reset action here if you want
-              }
+              localStorage.removeItem("token");
             }}
           >
             <i className="ti ti-logout text-xl mr-3" />

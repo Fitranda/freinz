@@ -1,50 +1,94 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import jwtDecode from "jwt-decode";
+
+export async function fetchAttendance() {
+  try {
+    const token = localStorage.getItem("token");
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/attendance`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!res.ok) throw new Error("Failed to fetch attendance");
+
+    const data = await res.json();
+    return data;
+  } catch (error) {
+    console.error("Fetch attendance error:", error);
+    return [];
+  }
+}
+
+// Fetch employee by ID (single employee)
+async function fetchEmployeeById(token, employeeId) {
+  try {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/employee/${employeeId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    if (!res.ok) throw new Error(`Failed to fetch employee ${employeeId}`);
+
+    const data = await res.json();
+    return data;
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+}
 
 export default function Attendance() {
   const [dateFilter, setDateFilter] = useState("");
+  const [attendanceData, setAttendanceData] = useState([]);
+  const [employeeMap, setEmployeeMap] = useState({}); // employeeId => employeeName
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
-  // Sample attendance data (added `time`)
-  const attendanceData = [
-    {
-      attendanceId: "ATT001",
-      employeeId: "EMP1234",
-      employeeName: "John Doe",
-      date: "2025-05-01",
-      time: "08:00",
-      photo: "photo1.jpg",
-      status: "Present",
-    },
-    {
-      attendanceId: "ATT002",
-      employeeId: "EMP2345",
-      employeeName: "Jane Smith",
-      date: "2025-05-01",
-      time: "08:20",
-      photo: "photo2.jpg",
-      status: "Late",
-    },
-    {
-      attendanceId: "ATT003",
-      employeeId: "EMP3456",
-      employeeName: "Michael Johnson",
-      date: "2025-05-01",
-      time: "07:55",
-      photo: "photo3.jpg",
-      status: "Present",
-    },
-    {
-      attendanceId: "ATT005",
-      employeeId: "EMP5678",
-      employeeName: "David Brown",
-      date: "2025-05-01",
-      time: "08:05",
-      photo: "photo5.jpg",
-      status: "Present",
-    },
-  ];
+  useEffect(() => {
+    async function loadData() {
+      if (!token) return;
+
+      const attendance = await fetchAttendance();
+      setAttendanceData(attendance);
+
+      // Extract unique employee IDs
+      const employeeIds = [
+        ...new Set(attendance.map((item) => item.employeeId)),
+      ];
+
+      // Fetch employees details in parallel
+      const employees = await Promise.all(
+        employeeIds.map((id) => fetchEmployeeById(token, id))
+      );
+
+      // Create map: employeeId => employeeName
+      const map = {};
+      employees.forEach((emp) => {
+        if (emp && emp.employeeId) {
+          map[emp.employeeId] = emp.name || emp.employeeName || "Unknown";
+        }
+      });
+      setEmployeeMap(map);
+    }
+
+    loadData();
+  }, [token]);
+
+  const filteredData = dateFilter
+    ? attendanceData.filter((item) => item.date === dateFilter)
+    : attendanceData;
 
   return (
     <div className="space-y-4">
@@ -60,7 +104,6 @@ export default function Attendance() {
             </button>
           </Link>
 
-          {/* Date Range Picker */}
           <div className="flex items-center space-x-2">
             <span className="text-gray-700">Tanggal:</span>
             <input
@@ -73,8 +116,8 @@ export default function Attendance() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
-        <table className="min-w-full table-auto text-sm text-left bg-white rounded-2xl shadow-sm overflow-x-auto">
+      <div className="grid grid-cols-1 gap-6 overflow-x-auto">
+        <table className="min-w-full table-auto text-sm text-left bg-white rounded-2xl shadow-sm">
           <thead>
             <tr className="bg-[#3F7F83] text-white">
               <th className="px-4 py-2">ID Absensi</th>
@@ -87,34 +130,57 @@ export default function Attendance() {
             </tr>
           </thead>
           <tbody>
-            {attendanceData.map((item, index) => (
-              <tr
-                key={item.attendanceId}
-                className={`border-b ${
-                  index % 2 === 0 ? "bg-gray-50" : "bg-white"
-                } hover:bg-gray-100`}
-              >
-                <td className="px-4 py-2 text-gray-700">{item.attendanceId}</td>
-                <td className="px-4 py-2 text-gray-700">{item.employeeId}</td>
-                <td className="px-4 py-2 text-gray-700">{item.employeeName}</td>
-                <td className="px-4 py-2 text-gray-700">{item.date}</td>
-                <td className="px-4 py-2 text-gray-700">{item.time}</td>
-                <td className="px-4 py-2 text-gray-700">{item.photo}</td>
-                <td className="px-4 py-2 text-gray-700">
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      item.status === "Present"
-                        ? "bg-green-100 text-green-800"
-                        : item.status === "Late"
-                        ? "bg-yellow-100 text-yellow-800"
-                        : "bg-red-100 text-red-800"
-                    }`}
-                  >
-                    {item.status}
-                  </span>
+            {filteredData.length > 0 ? (
+              filteredData.map((item, index) => (
+                <tr
+                  key={item.attendanceId}
+                  className={`border-b ${
+                    index % 2 === 0 ? "bg-gray-50" : "bg-white"
+                  } hover:bg-gray-100`}
+                >
+                  <td className="px-4 py-2 text-gray-700">
+                    {item.attendanceId}
+                  </td>
+                  <td className="px-4 py-2 text-gray-700">{item.employeeId}</td>
+                  <td className="px-4 py-2 text-gray-700">
+                    {employeeMap[item.employeeId] || "Loading..."}
+                  </td>
+                  <td className="px-4 py-2 text-gray-700">{item.date}</td>
+                  <td className="px-4 py-2 text-gray-700">{item.time}</td>
+                  <td className="px-4 py-2 text-blue-600 underline hover:text-blue-800 cursor-pointer">
+                    <a
+                      href={`${item.photo}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Photo
+                    </a>
+                  </td>
+                  <td className="px-4 py-2 text-gray-700">
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        item.status === "Present"
+                          ? "bg-green-100 text-green-800"
+                          : item.status === "Late"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {item.status}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td
+                  colSpan={7}
+                  className="px-4 py-2 text-center text-gray-500 italic"
+                >
+                  Tidak ada data absensi.
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>
