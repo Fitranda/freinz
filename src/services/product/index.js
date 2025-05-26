@@ -34,12 +34,6 @@ export async function createProduct(product) {
   try {
     const token = localStorage.getItem("token");
 
-    console.log("Creating product with data:", product);
-    console.log(
-      "API URL:",
-      `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/product`
-    );
-
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/product`,
       {
@@ -51,20 +45,6 @@ export async function createProduct(product) {
         body: JSON.stringify(product),
       }
     );
-
-    if (!res.ok) {
-      let errorMessage = res.statusText;
-      try {
-        const errorData = await res.text();
-        console.error("API Error Response:", errorData);
-        errorMessage = errorData || errorMessage;
-      } catch (e) {
-        console.error("Could not parse error response", e);
-      }
-      throw new Error(
-        `Failed to create product (${res.status}): ${errorMessage}`
-      );
-    }
 
     const data = await res.json();
     return {

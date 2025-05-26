@@ -34,7 +34,16 @@ export default function LoginPage() {
       dispatch(setUser(data.employee));
 
       toast.success("Login berhasil!");
-      router.push("/employee/dashboard");
+
+      const role = data.employee.role?.toLowerCase();
+
+      if (role === "employee") {
+        router.push("/employee/dashboard");
+      } else if (role === "admin") {
+        router.push("/admin/dashboard");
+      } else if (role === "supervisor") {
+        router.push("/supervisor/dashboard");
+      }
     } catch (error) {
       toast.error(
         "Login gagal: " + (error?.response?.data?.message || error.message)

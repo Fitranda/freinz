@@ -1,42 +1,106 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { fetchEmployeeById } from "@/services/employee"; // adjust path if needed
+import { createAttendance } from "@/services/attendance"; // adjust path if needed
 
 export default function AddAttendance() {
   const router = useRouter();
   const [photoFile, setPhotoFile] = useState(null);
+  const [employeeData, setEmployeeData] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const currentEmployee = {
-    employeeId: "EMP9281",
-    employeeName: "Fitranda Ramadhana",
-    date: new Date().toISOString().split("T")[0],
-    time: new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
-    latitude: "-6.2094",
-    longitude: "106.8462",
-  };
+  // Get current date and time strings
+  const getCurrentDate = () => new Date().toISOString().split("T")[0];
+  const getCurrentTime = () =>
+    new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-  const handleSubmit = (e) => {
+  // Get lat/long from browser geolocation if possible
+  const [location, setLocation] = useState({ latitude: "", longitude: "" });
+
+  useEffect(() => {
+    // Fetch employee from token
+    const fetchData = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        alert("User not authenticated");
+        router.push("/login");
+        return;
+      }
+
+      const emp = await fetchEmployeeById(token);
+      if (!emp) {
+        alert("Failed to fetch employee data");
+        router.push("/");
+        return;
+      }
+      setEmployeeData(emp);
+      setLoading(false);
+    };
+
+    fetchData();
+
+    // Get geolocation
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setLocation({
+            latitude: pos.coords.latitude.toFixed(6),
+            longitude: pos.coords.longitude.toFixed(6),
+          });
+        },
+        () => {
+          setLocation({ latitude: "", longitude: "" });
+        }
+      );
+    }
+  }, [router]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    alert("Absensi berhasil ditambahkan!");
-    setPhotoFile(null);
-    router.push("/attendance");
+
+    if (!photoFile) {
+      alert("Mohon pilih foto terlebih dahulu.");
+      return;
+    }
+    if (!employeeData) {
+      alert("Data karyawan belum tersedia.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("employeeId", employeeData.employeeId);
+    formData.append("employeeName", employeeData.employeeName);
+    formData.append("date", getCurrentDate());
+    formData.append("time", getCurrentTime());
+    formData.append("latitude", location.latitude);
+    formData.append("longitude", location.longitude);
+    formData.append("photo", photoFile);
+
+    try {
+      await createAttendance(formData);
+      alert("Absensi berhasil ditambahkan!");
+      setPhotoFile(null);
+      router.push("/employee/attendance/list");
+    } catch (error) {
+      alert(`Gagal menambahkan absensi: ${error.message}`);
+    }
   };
+
+  if (loading) return <div>Loading...</div>;
 
   return (
     <div className="p-6 max-w-2xl mx-auto bg-white rounded-lg shadow-md space-y-6">
       <h2 className="text-2xl font-bold text-gray-800">Tambah Absensi</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         {[
-          { label: "ID Karyawan", value: currentEmployee.employeeId },
-          { label: "Nama Karyawan", value: currentEmployee.employeeName },
-          { label: "Tanggal", value: currentEmployee.date, type: "date" },
-          { label: "Waktu", value: currentEmployee.time },
-          { label: "Latitude", value: currentEmployee.latitude },
-          { label: "Longitude", value: currentEmployee.longitude },
+          { label: "ID Karyawan", value: employeeData.employeeId },
+          { label: "Nama Karyawan", value: employeeData.employeeName },
+          { label: "Tanggal", value: getCurrentDate(), type: "date" },
+          { label: "Waktu", value: getCurrentTime() },
+          { label: "Latitude", value: location.latitude || "-6.2094" },
+          { label: "Longitude", value: location.longitude || "106.8462" },
         ].map(({ label, value, type = "text" }) => (
           <div key={label}>
             <label className="block text-sm font-medium text-gray-800">
