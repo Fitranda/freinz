@@ -6,6 +6,7 @@ import { setToken, setUser } from "@/redux/slices/auth";
 import { login } from "@/services/auth/index";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import { useSplash } from "@/providers/SplashProvider";
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({ username: "", password: "" });
@@ -13,8 +14,9 @@ export default function LoginPage() {
 
   const dispatch = useDispatch();
   const router = useRouter();
+  const { showSplashScreen } = useSplash();
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e) => {    
     e.preventDefault();
 
     if (!formData.username.trim() || !formData.password.trim()) {
@@ -31,21 +33,44 @@ export default function LoginPage() {
       });
 
       dispatch(setToken(data.token));
-      dispatch(setUser(data.employee));
+      dispatch(setUser(data.employee));      toast.success("Login successful!");      const role = data.employee.role?.toLowerCase();
 
-      toast.success("Login successful!");
+      // Mark that user came from login
+      sessionStorage.setItem("fromLogin", "true");
 
-      const role = data.employee.role?.toLowerCase();
-
+      // Determine target route
+      let targetRoute = "/employee/dashboard"; // default
       if (role === "employee") {
-        router.push("/employee/dashboard");
+        targetRoute = "/employee/dashboard";
       } else if (role === "admin") {
-        router.push("/admin/dashboard");
+        targetRoute = "/admin/dashboard";
       } else if (role === "supervisor") {
-        router.push("/supervisor/dashboard");
+        targetRoute = "/supervisor/dashboard";
       } else {
         toast.error("Unrecognized role. Please contact the administrator.");
+        return;
+      }      // Store user data in localStorage immediately for faster dashboard loading
+      localStorage.setItem("userRole", role);
+      localStorage.setItem("userData", JSON.stringify(data.employee));
+
+      // Show splash screen first
+      showSplashScreen();
+      
+      // Immediate navigation for supervisor role - bypass timing issues
+      if (role === "supervisor") {
+        setTimeout(() => {
+          router.push(targetRoute);
+        }, 100); // Slightly longer for supervisor to ensure state is set
+      } else {
+        setTimeout(() => {
+          router.push(targetRoute);
+        }, 50); // Faster for other roles
       }
+
+      // Fallback navigation in case splash screen takes too long
+      setTimeout(() => {
+        router.push(targetRoute);
+      }, 2000); // Longer fallback for more reliable navigation
     } catch (error) {
       toast.error(
         "Login failed: " + (error?.response?.data?.message || error.message)

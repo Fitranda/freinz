@@ -13,8 +13,7 @@ export default function Sidebar({ isOpen }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const navigationByRole = {
-    Employee: [
+  const navigationByRole = {    Employee: [
       { name: "Dashboard", icon: "home", href: "/employee/dashboard" },
       { name: "Absensi", icon: "users", href: "/employee/attendance/list" },
       {
@@ -23,6 +22,13 @@ export default function Sidebar({ isOpen }) {
         children: [
           { name: "Data Barang", href: "/employee/products/list" },
           { name: "Pesan Barang", href: "/employee/products/order/list" },
+        ],
+      },      {
+        name: "Purchase Order",
+        icon: "shopping-cart",
+        children: [
+          { name: "Pengajuan Baru", href: "/employee/purchase-orders/add" },
+          { name: "History Pengajuan", href: "/employee/purchase-orders/list" },
         ],
       },
       {
@@ -50,8 +56,7 @@ export default function Sidebar({ isOpen }) {
         icon: "building-store",
         href: "/admin/suppliers/list",
       },
-    ],
-    Supervisor: [
+    ],    Supervisor: [
       { name: "Dashboard", icon: "home", href: "/supervisor/dashboard" },
       {
         name: "Barang",
@@ -60,6 +65,11 @@ export default function Sidebar({ isOpen }) {
           { name: "Data Barang", href: "/supervisor/products/list" },
           { name: "Pesan Barang", href: "/supervisor/products/order/list" },
         ],
+      },
+      {
+        name: "Purchase Order",
+        icon: "shopping-cart",
+        href: "/supervisor/purchase-orders/list",
       },
       {
         name: "Transaksi",
@@ -74,13 +84,23 @@ export default function Sidebar({ isOpen }) {
       },
     ],
   };
-
   useEffect(() => {
     const fetchRole = async () => {
       setLoading(true);
       setError(null);
 
       try {
+        // Try to get cached role first for faster loading
+        const cachedRole = localStorage.getItem("userRole");
+        const cachedUserData = localStorage.getItem("userData");
+        
+        if (cachedRole && cachedUserData) {
+          const normalizedRole = cachedRole.charAt(0).toUpperCase() + cachedRole.slice(1).toLowerCase();
+          setRole(normalizedRole);
+          setLoading(false);
+          return; // Use cached data, skip API call
+        }
+
         const token = localStorage.getItem("token");
         if (!token) {
           setError("No authentication token found");
@@ -110,6 +130,10 @@ export default function Sidebar({ isOpen }) {
           employee.role?.charAt(0).toUpperCase() +
           employee.role?.slice(1).toLowerCase();
         setRole(normalizedRole);
+        
+        // Cache the role and user data for faster future loads
+        localStorage.setItem("userRole", employee.role?.toLowerCase());
+        localStorage.setItem("userData", JSON.stringify(employee));
       } catch (err) {
         console.error("Failed to fetch role:", err);
         setError("Failed to load user role");
@@ -146,10 +170,11 @@ export default function Sidebar({ isOpen }) {
   const handleToggleMenu = (name) => {
     setOpenMenu((prev) => (prev === name ? null : name));
   };
-
   const handleLogout = () => {
     localStorage.removeItem("token");
-    // Optionally redirect to login page or refresh
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("userData");
+    // Redirect to login page
     window.location.href = "/login";
   };
 
