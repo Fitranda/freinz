@@ -26,14 +26,12 @@ export async function createAttendance(attendance) {
   try {
     const token = localStorage.getItem("token");
 
-    // attendance here is expected to be a FormData object
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/attendance`,
       {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
-          // DO NOT set Content-Type here for FormData!
         },
         body: attendance,
       }

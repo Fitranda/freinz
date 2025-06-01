@@ -1,40 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { fetchEmployee } from "@/services/employee/index";
 
 export default function EmployeeList() {
   const [search, setSearch] = useState("");
+  const [employees, setEmployees] = useState([]);
 
-  const employees = [
-    {
-      id: "EMP001",
-      name: "Indra Gunawan",
-      role: "Karyawan Toko",
-      storename: "Frenz Rungkut",
-      username: "indrag",
-      password: "********",
-      contact: "08123456789",
-    },
-    {
-      id: "EMP002",
-      name: "Bima Bagus",
-      role: "Karyawan Toko",
-      storename: "Frenz Sukolilo",
-      username: "bimasb",
-      password: "********",
-      contact: "08234567890",
-    },
-    {
-      id: "EMP003",
-      name: "Kevin Apriliano",
-      role: "Admin",
-      storename: "Head Office",
-      username: "kevinapp",
-      password: "********",
-      contact: "08345678901",
-    },
-  ];
+  useEffect(() => {
+    const loadEmployees = async () => {
+      try {
+        const token = localStorage.getItem("token"); // Adjust if you use cookies or a different key
+        if (!token) return;
+
+        const data = await fetchEmployee(token);
+        setEmployees(data || []);
+      } catch (error) {
+        console.error("Failed to load employees:", error);
+      }
+    };
+
+    loadEmployees();
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -72,7 +60,6 @@ export default function EmployeeList() {
               <th className="px-4 py-2">Role</th>
               <th className="px-4 py-2">Toko</th>
               <th className="px-4 py-2">Username</th>
-              <th className="px-4 py-2">Password</th>
               <th className="px-4 py-2">Kontak</th>
               <th className="px-4 py-2">Aksi</th>
             </tr>
@@ -81,25 +68,30 @@ export default function EmployeeList() {
             {employees
               .filter(
                 (e) =>
-                  e.name.toLowerCase().includes(search.toLowerCase()) ||
-                  e.id.toLowerCase().includes(search.toLowerCase())
+                  e.employeeName.toLowerCase().includes(search.toLowerCase()) ||
+                  String(e.employeeId)
+                    .toLowerCase()
+                    .includes(search.toLowerCase())
               )
               .map((emp, index) => (
                 <tr
-                  key={emp.id}
+                  key={emp.employeeId}
                   className={`border-b ${
                     index % 2 === 0 ? "bg-gray-50" : "bg-white"
                   } hover:bg-gray-100`}
                 >
-                  <td className="px-4 py-2 text-gray-700">{emp.id}</td>
-                  <td className="px-4 py-2 text-gray-700">{emp.name}</td>
+                  <td className="px-4 py-2 text-gray-700">{emp.employeeId}</td>
+                  <td className="px-4 py-2 text-gray-700">
+                    {emp.employeeName}
+                  </td>
                   <td className="px-4 py-2 text-gray-700">{emp.role}</td>
                   <td className="px-4 py-2 text-gray-700">{emp.storename}</td>
                   <td className="px-4 py-2 text-gray-700">{emp.username}</td>
-                  <td className="px-4 py-2 text-gray-700">{emp.password}</td>
                   <td className="px-4 py-2 text-gray-700">{emp.contact}</td>
                   <td className="px-4 py-2 text-gray-700">
-                    <Link href={`/supervisor/employees/detail/${emp.id}`}>
+                    <Link
+                      href={`/supervisor/employees/detail/${emp.employeeId}`}
+                    >
                       <button className="px-3 py-1 text-sm bg-[#3F7F83] text-white rounded hover:bg-[#4F969A] transition">
                         Detail
                       </button>

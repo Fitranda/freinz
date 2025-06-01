@@ -1,101 +1,139 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import toast, { Toaster } from "react-hot-toast";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { fetchProducts } from "@/services/product/index";
 
 export default function Products() {
   const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
   const [searchTerm, setSearchTerm] = useState("");
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
-    const loadProducts = async () => {
+    async function loadProducts() {
+      setLoading(true);
       try {
         const data = await fetchProducts();
-        setProducts(Array.isArray(data) ? data : []);
+        setProducts(data);
       } catch (error) {
-        console.error("Failed to fetch products:", error);
+        console.error("Error loading products:", error);
+        toast.error("Failed to load products");
+      } finally {
+        setLoading(false);
       }
-    };
+    }
     loadProducts();
   }, []);
 
-  // Filter products by search term (case-insensitive)
   const filteredProducts = useMemo(() => {
     if (!searchTerm.trim()) return products;
-    return products.filter((product) =>
-      (product.productName ?? product.name ?? product.nama ?? "")
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase())
+    const lowerSearch = searchTerm.toLowerCase();
+    return products.filter(
+      (p) =>
+        p.productName.toLowerCase().includes(lowerSearch) ||
+        p.productId.toString().toLowerCase().includes(lowerSearch)
     );
   }, [products, searchTerm]);
 
-  // Calculate total pages for pagination
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredProducts.length / rowsPerPage)
-  );
+  const totalPages =
+    rowsPerPage === 0
+      ? 1
+      : Math.max(1, Math.ceil(filteredProducts.length / rowsPerPage));
 
-  // Ensure currentPage is valid when rowsPerPage or filteredProducts changes
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [totalPages, currentPage]);
+  if (currentPage > totalPages) setCurrentPage(totalPages);
 
-  // Paginate filtered products
   const paginatedProducts = useMemo(() => {
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    return filteredProducts.slice(startIndex, startIndex + rowsPerPage);
+    if (rowsPerPage === 0) return filteredProducts;
+    const start = (currentPage - 1) * rowsPerPage;
+    return filteredProducts.slice(start, start + rowsPerPage);
   }, [filteredProducts, currentPage, rowsPerPage]);
 
-  // Handlers
   function handleSearchChange(e) {
     setSearchTerm(e.target.value);
-    setCurrentPage(1); // Reset to first page on search change
+    setCurrentPage(1);
   }
 
   function handleRowsPerPageChange(e) {
-    setRowsPerPage(Number(e.target.value));
-    setCurrentPage(1); // Reset to first page on rows per page change
+    const value = e.target.value;
+    setRowsPerPage(value === "all" ? 0 : Number(value));
+    setCurrentPage(1);
   }
 
-  function goToPreviousPage() {
-    setCurrentPage((page) => Math.max(1, page - 1));
+  function handlePreviousPage() {
+    setCurrentPage((prev) => Math.max(prev - 1, 1));
   }
 
-  function goToNextPage() {
-    setCurrentPage((page) => Math.min(totalPages, page + 1));
+  function handleNextPage() {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
   }
+
+  function handleExportPDF() {
+    const doc = new jsPDF();
+
+    doc.setFontSize(14);
+    doc.text("PT Hadi Teknik", 14, 15);
+    doc.setFontSize(10);
+    doc.text("Jl. Contoh Alamat No.123, Jakarta", 14, 21);
+    doc.text(
+      `Tanggal Export: ${new Date().toLocaleDateString("id-ID")}`,
+      14,
+      27
+    );
+
+    doc.setFontSize(16);
+    doc.text("Laporan Data Produk", 14, 37);
+
+    const tableColumn = ["Kode Produk", "Nama Produk", "Stok", "Harga"];
+    const tableRows = products.map((product) => [
+      product.productId,
+      product.productName,
+      `${product.stock ?? 0} pcs`,
+      `Rp ${(product.price ?? 0).toLocaleString("id-ID")}`,
+    ]);
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 45,
+    });
+
+    doc.save("laporan-produk.pdf");
+  }
+
+  if (loading) return <div>Loading...</div>;
 
   return (
     <div className="space-y-4">
       <div className="font-poppins">
-        <h1 className="text-3xl font-bold text-[#2B5658]">List Barang</h1>
+        <h1 className="text-3xl font-bold text-[#2B5658]">Product List</h1>
       </div>
 
       <div className="flex justify-between items-center">
+        <div>
+          <select
+            className="px-3 py-2 border-2 border-[#3F7F83] rounded-lg text-gray-700"
+            value={rowsPerPage === 0 ? "all" : rowsPerPage}
+            onChange={handleRowsPerPageChange}
+          >
+            <option value={10}>10 rows</option>
+            <option value={20}>20 rows</option>
+            <option value="all">All rows</option>
+          </select>
+        </div>
+
         <div className="flex space-x-2 items-center">
           <input
             type="text"
+            placeholder="Search product..."
+            className="w-[250px] px-4 py-2 border-2 text-gray-700 border-[#3F7F83] rounded-lg placeholder-gray-500"
             value={searchTerm}
             onChange={handleSearchChange}
-            placeholder="Cari Barang..."
-            className="w-[200px] px-4 py-2 border-2 text-gray-700 border-[#3F7F83] rounded-lg placeholder-gray-500"
           />
-        </div>
-
-        <div>
-          <select
-            value={rowsPerPage}
-            onChange={handleRowsPerPageChange}
-            className="px-3 py-2 border-2 border-[#3F7F83] rounded-lg text-gray-700"
-          >
-            <option value={5}>5 rows</option>
-            <option value={10}>10 rows</option>
-            <option value={20}>20 rows</option>
-          </select>
         </div>
       </div>
 
@@ -103,73 +141,75 @@ export default function Products() {
         <table className="min-w-full table-auto text-sm text-left bg-white rounded-2xl shadow-sm overflow-x-auto">
           <thead>
             <tr className="bg-[#3F7F83] text-white">
-              <th className="px-4 py-2">Kode</th>
-              <th className="px-4 py-2 w-full">Nama Barang</th>
-              <th className="px-4 py-2 text-center">Stok</th>
-              <th className="px-4 py-2 text-center">Harga Jual Satuan</th>
+              <th className="px-4 py-2">Code</th>
+              <th className="px-4 py-2 w-full">Product Name</th>
+              <th className="px-4 py-2 text-center">Stock</th>
+              <th className="px-4 py-2 text-center">Unit Price</th>
             </tr>
           </thead>
           <tbody>
-            {paginatedProducts.length === 0 ? (
+            {paginatedProducts.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-4 text-center text-gray-500">
-                  Tidak ada data barang ditemukan
+                <td colSpan="4" className="text-center py-4 text-gray-500">
+                  No products found
                 </td>
               </tr>
-            ) : (
-              paginatedProducts.map((product, index) => (
-                <tr
-                  key={product.productId ?? index} // Prefer productId for key
-                  className={`border-b ${
-                    index % 2 === 0 ? "bg-gray-50" : "bg-white"
-                  } hover:bg-gray-100`}
-                >
-                  <td className="px-4 py-2 text-gray-700 w-[120px]">
-                    {product.productId}
-                  </td>
-                  <td className="px-4 py-2 text-gray-700">
-                    {product.productName ?? product.name ?? product.nama}
-                  </td>
-                  <td className="px-4 py-2 text-center text-gray-700 whitespace-nowrap">
-                    {product.stock ?? 0} Pcs
-                  </td>
-                  <td className="px-4 py-2 text-center text-gray-700 min-w-[180px] whitespace-nowrap">
-                    Rp {Number(product.price ?? 0).toLocaleString("id-ID")}
-                  </td>
-                </tr>
-              ))
             )}
+
+            {paginatedProducts.map((product) => (
+              <tr
+                key={product.productId}
+                className="border-b bg-gray-50 hover:bg-gray-100"
+              >
+                <td className="px-4 py-2 text-gray-700 w-[120px]">
+                  {product.productId}
+                </td>
+
+                <td className="px-4 py-2 text-gray-700">
+                  {product.productName}
+                </td>
+
+                <td className="px-4 py-2 text-center text-gray-700 whitespace-nowrap">
+                  {`${product.stock ?? 0} pcs`}
+                </td>
+
+                <td className="px-4 py-2 text-center text-gray-700 whitespace-nowrap">
+                  {`Rp ${(product.price ?? 0).toLocaleString("id-ID")}`}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
 
-        <div className="flex justify-between items-center px-2">
+        <div className="flex justify-between items-center space-x-2 font-semibold text-gray-700">
           <button
-            onClick={goToPreviousPage}
-            disabled={currentPage === 1}
-            className={`px-4 py-2 rounded-lg text-white transition ${
-              currentPage === 1
-                ? "bg-gray-300 cursor-not-allowed"
-                : "bg-[#3F7F83] hover:bg-[#4F969A]"
-            }`}
+            onClick={handleExportPDF}
+            className="w-[150px] px-4 py-2 border bg-[#5A8F91] text-white rounded-lg hover:bg-[#6BA9AC] transition"
           >
-            Previous
+            Export PDF
           </button>
 
-          <div className="text-gray-700">
-            Halaman {currentPage} dari {totalPages}
+          <div className="flex items-center space-x-3 text-sm font-semibold text-gray-700">
+            <button
+              onClick={handlePreviousPage}
+              disabled={currentPage === 1}
+              className="px-4 py-2 bg-[#5A8F91] text-white rounded-lg hover:bg-[#6BA9AC] disabled:bg-gray-300 disabled:text-gray-500 transition"
+            >
+              Previous
+            </button>
+
+            <span className="px-2 text-gray-800">
+              Page {currentPage} / {totalPages}
+            </span>
+
+            <button
+              onClick={handleNextPage}
+              disabled={currentPage === totalPages}
+              className="px-4 py-2 bg-[#5A8F91] text-white rounded-lg hover:bg-[#6BA9AC] disabled:bg-gray-300 disabled:text-gray-500 transition"
+            >
+              Next
+            </button>
           </div>
-
-          <button
-            onClick={goToNextPage}
-            disabled={currentPage === totalPages}
-            className={`px-4 py-2 rounded-lg text-white transition ${
-              currentPage === totalPages
-                ? "bg-gray-300 cursor-not-allowed"
-                : "bg-[#3F7F83] hover:bg-[#4F969A]"
-            }`}
-          >
-            Next
-          </button>
         </div>
       </div>
     </div>

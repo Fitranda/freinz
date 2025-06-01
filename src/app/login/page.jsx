@@ -18,11 +18,11 @@ export default function LoginPage() {
     e.preventDefault();
 
     if (!formData.username.trim() || !formData.password.trim()) {
-      toast.error("Username dan kata sandi harus diisi.");
+      toast.error("Username and password must be filled.");
       return;
     }
 
-    setLoading(true); // Mulai loading
+    setLoading(true);
 
     try {
       const data = await login({
@@ -33,7 +33,7 @@ export default function LoginPage() {
       dispatch(setToken(data.token));
       dispatch(setUser(data.employee));
 
-      toast.success("Login berhasil!");
+      toast.success("Login successful!");
 
       const role = data.employee.role?.toLowerCase();
 
@@ -43,13 +43,15 @@ export default function LoginPage() {
         router.push("/admin/dashboard");
       } else if (role === "supervisor") {
         router.push("/supervisor/dashboard");
+      } else {
+        toast.error("Unrecognized role. Please contact the administrator.");
       }
     } catch (error) {
       toast.error(
-        "Login gagal: " + (error?.response?.data?.message || error.message)
+        "Login failed: " + (error?.response?.data?.message || error.message)
       );
-    }finally {
-      setLoading(false); // Selesai loading
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -90,7 +92,7 @@ export default function LoginPage() {
       <div className="flex w-full max-w-[1280px] mx-auto p-5 relative z-[1] lg:flex-row flex-col items-center lg:p-10">
         <div className="lg:ml-auto p-10 w-full max-w-[472px] shadow-2xl rounded-[20px] bg-white">
           <div className="font-poppins text-[48px] font-bold text-black mb-5 text-center sm:text-left">
-            Selamat Datang!
+            Welcome!
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-[20px]">
@@ -105,6 +107,7 @@ export default function LoginPage() {
                   setFormData({ ...formData, username: e.target.value })
                 }
                 className="bg-transparent border-none font-poppins text-[24px] font-light text-black w-full focus:outline-none"
+                autoComplete="username"
               />
             </div>
 
@@ -113,21 +116,25 @@ export default function LoginPage() {
               <i className="ti ti-lock text-[24px] text-black mr-5" />
               <input
                 type="password"
-                placeholder="Kata Sandi"
+                placeholder="Password"
                 value={formData.password}
                 onChange={(e) =>
                   setFormData({ ...formData, password: e.target.value })
                 }
                 className="bg-transparent border-none font-poppins text-[24px] font-light text-black w-full focus:outline-none"
+                autoComplete="current-password"
               />
             </div>
 
             {/* Submit */}
             <button
               type="submit"
-              className="w-full h-[76px] rounded-[20px] text-white font-poppins font-bold mt-[20px] bg-[#3F7F83] sm:text-[36px] text-[24px] flex items-center justify-center"
+              disabled={loading}
+              className={`w-full h-[76px] rounded-[20px] text-white font-poppins font-bold mt-[20px] ${
+                loading ? "bg-gray-400 cursor-not-allowed" : "bg-[#3F7F83]"
+              } sm:text-[36px] text-[24px] flex items-center justify-center`}
             >
-              Masuk
+              {loading ? "Processing..." : "Login"}
             </button>
           </form>
         </div>

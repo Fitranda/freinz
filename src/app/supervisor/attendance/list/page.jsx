@@ -101,12 +101,6 @@ export default function Attendance() {
 
       <div className="flex justify-between items-center">
         <div className="flex space-x-2 items-center">
-          <Link href="/employee/attendance/addAttendance">
-            <button className="w-[170px] px-4 py-2 border bg-[#3F7F83] text-white rounded-lg hover:bg-[#4F969A] transition">
-              Add Attendance
-            </button>
-          </Link>
-
           <div className="flex items-center space-x-2">
             <span className="text-gray-700">Date:</span>
             <input

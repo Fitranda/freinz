@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import toast, { Toaster } from "react-hot-toast";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import {
   fetchProducts,
   createProduct,
@@ -11,12 +14,12 @@ import {
 export default function Products() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [editingId, setEditingId] = useState(null); // which productId is editing
-  const [newProduct, setNewProduct] = useState(null); // for new product row
-  const [tempData, setTempData] = useState({}); // temporary edited data
+  const [editingId, setEditingId] = useState(null);
+  const [newProduct, setNewProduct] = useState(null);
+  const [tempData, setTempData] = useState({});
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
@@ -27,7 +30,7 @@ export default function Products() {
         setProducts(data);
       } catch (error) {
         console.error("Error loading products:", error);
-        alert("Failed to load products");
+        toast.error("Failed to load products");
       } finally {
         setLoading(false);
       }
@@ -35,28 +38,28 @@ export default function Products() {
     loadProducts();
   }, []);
 
-  // Filter products based on search term (case-insensitive)
   const filteredProducts = useMemo(() => {
     if (!searchTerm.trim()) return products;
-    return products.filter((p) =>
-      p.productName.toLowerCase().includes(searchTerm.toLowerCase())
+    const lowerSearch = searchTerm.toLowerCase();
+    return products.filter(
+      (p) =>
+        p.productName.toLowerCase().includes(lowerSearch) ||
+        p.productId.toString().toLowerCase().includes(lowerSearch)
     );
   }, [products, searchTerm]);
 
-  // Pagination calculations
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredProducts.length / rowsPerPage)
-  );
-  // Clamp currentPage if totalPages decreased
+  const totalPages =
+    rowsPerPage === 0
+      ? 1
+      : Math.max(1, Math.ceil(filteredProducts.length / rowsPerPage));
+
   if (currentPage > totalPages) setCurrentPage(totalPages);
 
   const paginatedProducts = useMemo(() => {
+    if (rowsPerPage === 0) return filteredProducts;
     const start = (currentPage - 1) * rowsPerPage;
     return filteredProducts.slice(start, start + rowsPerPage);
   }, [filteredProducts, currentPage, rowsPerPage]);
-
-  // Handlers
 
   function handleEdit(product) {
     setEditingId(product.productId);
@@ -65,7 +68,7 @@ export default function Products() {
       price: product.price,
       stock: product.stock,
     });
-    setNewProduct(null); // cancel adding new if editing existing
+    setNewProduct(null);
   }
 
   function handleChange(e) {
@@ -82,7 +85,7 @@ export default function Products() {
       tempData.price === "" ||
       tempData.stock === ""
     ) {
-      alert("Please fill all fields");
+      toast.error("Please fill all fields");
       return;
     }
     try {
@@ -103,9 +106,10 @@ export default function Products() {
       );
       setEditingId(null);
       setTempData({});
+      toast.success("Product updated successfully");
     } catch (error) {
       console.error("Update product error details:", error);
-      alert(`Failed to update product: ${error.message}`);
+      toast.error(`Failed to update product: ${error.message}`);
     }
   }
 
@@ -135,7 +139,7 @@ export default function Products() {
       newProduct.price === "" ||
       newProduct.stock === ""
     ) {
-      alert("Please fill all fields");
+      toast.error("Please fill all fields");
       return;
     }
     try {
@@ -149,12 +153,24 @@ export default function Products() {
         ...created,
         stock: created.stock ?? productData.stock ?? 0,
       };
-      setProducts((prev) => [normalizedCreated, ...prev]);
+
+      const updatedProducts = [...products, normalizedCreated];
+      setProducts(updatedProducts);
       setNewProduct(null);
-      setCurrentPage(1); // show newest on first page
+
+      let newTotalPages = 1;
+      if (rowsPerPage === 0) {
+        newTotalPages = 1;
+      } else {
+        newTotalPages = Math.ceil(updatedProducts.length / rowsPerPage);
+      }
+
+      setCurrentPage(newTotalPages);
+
+      toast.success("Product created successfully");
     } catch (error) {
       console.error("Create product error details:", error);
-      alert(`Failed to create product: ${error.message}`);
+      toast.error(`Failed to create product: ${error.message}`);
     }
   }
 
@@ -162,35 +178,35 @@ export default function Products() {
     setNewProduct(null);
   }
 
-  // Delete product handler
   async function handleDelete(productId) {
-    if (!confirm("Are you sure you want to delete this product?")) return;
+    if (!window.confirm("Are you sure you want to delete this product?"))
+      return;
+
     try {
       await deleteProduct(productId);
       setProducts((prev) => prev.filter((p) => p.productId !== productId));
-      // Adjust current page if last item on last page is deleted
+
       if (paginatedProducts.length === 1 && currentPage > 1) {
         setCurrentPage(currentPage - 1);
       }
+
+      toast.success("Product deleted successfully");
     } catch (error) {
       console.error("Delete product error details:", error);
-      alert(`Failed to delete product: ${error.message}`);
+      toast.error(`Failed to delete product: ${error.message}`);
     }
   }
-
-  // Search input change
   function handleSearchChange(e) {
     setSearchTerm(e.target.value);
-    setCurrentPage(1); // reset page when searching
+    setCurrentPage(1);
   }
 
-  // Rows per page change
   function handleRowsPerPageChange(e) {
-    setRowsPerPage(Number(e.target.value));
-    setCurrentPage(1); // reset page when rows per page changes
+    const value = e.target.value;
+    setRowsPerPage(value === "all" ? 0 : Number(value));
+    setCurrentPage(1);
   }
 
-  // Pagination buttons
   function handlePreviousPage() {
     setCurrentPage((prev) => Math.max(prev - 1, 1));
   }
@@ -199,32 +215,65 @@ export default function Products() {
     setCurrentPage((prev) => Math.min(prev + 1, totalPages));
   }
 
+  function handleExportPDF() {
+    const doc = new jsPDF();
+
+    doc.setFontSize(14);
+    doc.text("PT Hadi Teknik", 14, 15);
+    doc.setFontSize(10);
+    doc.text("Jl. Contoh Alamat No.123, Jakarta", 14, 21);
+    doc.text(
+      `Tanggal Export: ${new Date().toLocaleDateString("id-ID")}`,
+      14,
+      27
+    );
+
+    doc.setFontSize(16);
+    doc.text("Laporan Data Produk", 14, 37);
+
+    const tableColumn = ["Kode Produk", "Nama Produk", "Stok", "Harga"];
+    const tableRows = products.map((product) => [
+      product.productId,
+      product.productName,
+      `${product.stock ?? 0} pcs`,
+      `Rp ${(product.price ?? 0).toLocaleString("id-ID")}`,
+    ]);
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 45,
+    });
+
+    doc.save("laporan-produk.pdf");
+  }
+
   if (loading) return <div>Loading...</div>;
 
   return (
     <div className="space-y-4">
       <div className="font-poppins">
-        <h1 className="text-3xl font-bold text-[#2B5658]">List Barang</h1>
+        <h1 className="text-3xl font-bold text-[#2B5658]">Product List</h1>
       </div>
 
       <div className="flex justify-between items-center">
         <div>
           <select
             className="px-3 py-2 border-2 border-[#3F7F83] rounded-lg text-gray-700"
-            value={rowsPerPage}
+            value={rowsPerPage === 0 ? "all" : rowsPerPage}
             onChange={handleRowsPerPageChange}
           >
-            <option value={5}>5 rows</option>
             <option value={10}>10 rows</option>
             <option value={20}>20 rows</option>
+            <option value="all">All rows</option>
           </select>
         </div>
 
         <div className="flex space-x-2 items-center">
           <input
             type="text"
-            placeholder="Cari Barang..."
-            className="w-[200px] px-4 py-2 border-2 text-gray-700 border-[#3F7F83] rounded-lg placeholder-gray-500"
+            placeholder="Search product..."
+            className="w-[250px] px-4 py-2 border-2 text-gray-700 border-[#3F7F83] rounded-lg placeholder-gray-500"
             value={searchTerm}
             onChange={handleSearchChange}
           />
@@ -232,7 +281,7 @@ export default function Products() {
             onClick={handleAddNew}
             className="w-[150px] px-4 py-2 border bg-[#3F7F83] text-white rounded-lg hover:bg-[#4F969A] transition"
           >
-            Tambah Barang
+            Add Product
           </button>
         </div>
       </div>
@@ -241,10 +290,10 @@ export default function Products() {
         <table className="min-w-full table-auto text-sm text-left bg-white rounded-2xl shadow-sm overflow-x-auto">
           <thead>
             <tr className="bg-[#3F7F83] text-white">
-              <th className="px-4 py-2">Kode</th>
-              <th className="px-4 py-2 w-full">Nama Barang</th>
-              <th className="px-4 py-2 text-center">Stok</th>
-              <th className="px-4 py-2 text-center">Harga Jual Satuan</th>
+              <th className="px-4 py-2">Code</th>
+              <th className="px-4 py-2 w-full">Product Name</th>
+              <th className="px-4 py-2 text-center">Stock</th>
+              <th className="px-4 py-2 text-center">Unit Price</th>
               <th className="px-4 py-2 text-center">Action</th>
             </tr>
           </thead>
@@ -260,7 +309,7 @@ export default function Products() {
                     value={newProduct.productName}
                     onChange={handleChangeNew}
                     className="w-full px-2 py-1 border rounded text-gray-700"
-                    placeholder="Nama Barang"
+                    placeholder="Product Name"
                   />
                 </td>
                 <td className="px-4 py-2 text-center">
@@ -306,12 +355,12 @@ export default function Products() {
             {paginatedProducts.length === 0 && !newProduct && (
               <tr>
                 <td colSpan="5" className="text-center py-4 text-gray-500">
-                  Tidak ada data produk
+                  No products found
                 </td>
               </tr>
             )}
 
-            {/* Existing Products Paginated */}
+            {/* Existing Products */}
             {paginatedProducts.map((product) => (
               <tr
                 key={product.productId}
@@ -346,7 +395,7 @@ export default function Products() {
                       min={0}
                     />
                   ) : (
-                    `${product.stock ?? 0} Pcs`
+                    `${product.stock ?? 0} pcs`
                   )}
                 </td>
 
@@ -403,35 +452,35 @@ export default function Products() {
           </tbody>
         </table>
 
-        {/* Pagination Controls */}
-        <div className="flex justify-between items-center px-2">
+        <div className="flex justify-between items-center space-x-2 font-semibold text-gray-700">
           <button
-            onClick={handlePreviousPage}
-            disabled={currentPage === 1}
-            className={`px-4 py-2 rounded-lg transition ${
-              currentPage === 1
-                ? "bg-gray-300 cursor-not-allowed"
-                : "bg-[#3F7F83] text-white hover:bg-[#4F969A]"
-            }`}
+            onClick={handleExportPDF}
+            className="w-[150px] px-4 py-2 border bg-[#5A8F91] text-white rounded-lg hover:bg-[#6BA9AC] transition"
           >
-            Previous
+            Export PDF
           </button>
 
-          <div className="text-gray-700">
-            Page {currentPage} of {totalPages}
+          <div className="flex items-center space-x-3 text-sm font-semibold text-gray-700">
+            <button
+              onClick={handlePreviousPage}
+              disabled={currentPage === 1}
+              className="px-4 py-2 bg-[#5A8F91] text-white rounded-lg hover:bg-[#6BA9AC] disabled:bg-gray-300 disabled:text-gray-500 transition"
+            >
+              Previous
+            </button>
+
+            <span className="px-2 text-gray-800">
+              Page {currentPage} / {totalPages}
+            </span>
+
+            <button
+              onClick={handleNextPage}
+              disabled={currentPage === totalPages}
+              className="px-4 py-2 bg-[#5A8F91] text-white rounded-lg hover:bg-[#6BA9AC] disabled:bg-gray-300 disabled:text-gray-500 transition"
+            >
+              Next
+            </button>
           </div>
-
-          <button
-            onClick={handleNextPage}
-            disabled={currentPage === totalPages}
-            className={`px-4 py-2 rounded-lg transition ${
-              currentPage === totalPages
-                ? "bg-gray-300 cursor-not-allowed"
-                : "bg-[#3F7F83] text-white hover:bg-[#4F969A]"
-            }`}
-          >
-            Next
-          </button>
         </div>
       </div>
     </div>

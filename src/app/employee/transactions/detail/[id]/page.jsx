@@ -85,25 +85,51 @@ export default function SalesDetail() {
       <div className="max-w-4xl mx-auto px-4">
         {/* Header Actions */}
         <div className="flex justify-between items-center mb-6 print:hidden">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
-          >
-            <svg
-              className="w-5 h-5 mr-2"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          <div className="flex items-center">
+            <button
+              onClick={() => router.back()}
+              className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
-            Kembali
-          </button>
+              <svg
+                className="w-5 h-5 mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+              Kembali
+            </button>
+
+            {saleData.method?.toLowerCase() === "qris" &&
+              saleData.proofQris && (
+                <button
+                  onClick={() => router.push(saleData.proofQris)}
+                  className="flex items-center px-4 py-2 bg-[#F59E0B] text-white rounded-lg hover:bg-[#D97706] transition ml-4"
+                >
+                  <svg
+                    className="w-5 h-5 mr-2"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-3-3v6m6 0a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  Lihat Bukti QRIS
+                </button>
+              )}
+          </div>
+
           <button
             onClick={handlePrint}
             className="flex items-center px-4 py-2 bg-[#3F7F83] text-white rounded-lg hover:bg-[#4F969A] transition"
@@ -218,36 +244,38 @@ export default function SalesDetail() {
                   </tr>
                 </thead>
                 <tbody>
-                  {saleData.details?.map((item, index) => (
-                    <tr
-                      key={item.saleDetailId}
-                      className="border-b border-gray-100"
-                    >
-                      <td className="py-4 px-2 text-gray-600">{index + 1}</td>
-                      <td className="py-4 px-2">
-                        <div>
-                          <p className="font-medium text-gray-800">
-                            {item.productName ||
-                              `Product ID: ${item.productId}`}
-                          </p>
-                          {item.productDescription && (
-                            <p className="text-sm text-gray-500">
-                              {item.productDescription}
+                  {saleData.details?.length > 0 ? (
+                    saleData.details.map((item, index) => (
+                      <tr
+                        key={item.saleDetailId}
+                        className="border-b border-gray-100"
+                      >
+                        <td className="py-4 px-2 text-gray-600">{index + 1}</td>
+                        <td className="py-4 px-2">
+                          <div>
+                            <p className="font-medium text-gray-800">
+                              {item.productName ||
+                                `Product ID: ${item.productId}`}
                             </p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-4 px-2 text-center text-gray-600">
-                        {item.quantity}
-                      </td>
-                      <td className="py-4 px-2 text-right text-gray-600">
-                        {formatCurrency(item.price)}
-                      </td>
-                      <td className="py-4 px-2 text-right font-medium text-gray-800">
-                        {formatCurrency(item.subtotal)}
-                      </td>
-                    </tr>
-                  )) || (
+                            {item.productDescription && (
+                              <p className="text-sm text-gray-500">
+                                {item.productDescription}
+                              </p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-4 px-2 text-center text-gray-600">
+                          {item.quantity}
+                        </td>
+                        <td className="py-4 px-2 text-right text-gray-600">
+                          {formatCurrency(item.price)}
+                        </td>
+                        <td className="py-4 px-2 text-right font-medium text-gray-800">
+                          {formatCurrency(item.subtotal)}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
                     <tr>
                       <td
                         colSpan={5}

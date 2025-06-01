@@ -5,8 +5,6 @@ import {
   Database,
   ChartBar,
   Clock,
-  CreditCard,
-  Package,
   User,
   MapPin,
   Phone,
@@ -17,21 +15,52 @@ import {
 import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { fetchEmployeeById } from "@/services/employee";
+import { jwtDecode } from "jwt-decode";
 import Stats from "@/components/dashboard/Stats";
+import { useRouter } from "next/navigation";
 
 export default function Dashboard() {
   const token = useSelector((state) => state.auth.token);
+  const router = useRouter();
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     async function getEmployee() {
-      if (!token) return;
+      if (!token) {
+        setLoading(false);
+        return;
+      }
 
       setLoading(true);
-      const data = await fetchEmployeeById(token);
-      setEmployee(data);
-      setLoading(false);
+      setError(null);
+
+      try {
+        // Decode token to get employee ID
+        const decoded = jwtDecode(token);
+        const employeeId = decoded.employeeId || decoded.id;
+
+        if (!employeeId) {
+          setError("Employee ID not found in token");
+          setLoading(false);
+          return;
+        }
+
+        // Fetch employee data with correct parameters
+        const data = await fetchEmployeeById(employeeId, token);
+
+        if (data) {
+          setEmployee(data);
+        } else {
+          setError("Failed to fetch employee data");
+        }
+      } catch (err) {
+        console.error("Failed to fetch employee:", err);
+        setError("Failed to load employee data");
+      } finally {
+        setLoading(false);
+      }
     }
 
     getEmployee();
@@ -39,12 +68,12 @@ export default function Dashboard() {
 
   const getIconForField = (label) => {
     const iconMap = {
-      "ID Pegawai": <Hash className="w-5 h-5" />,
-      Nama: <User className="w-5 h-5" />,
-      Alamat: <MapPin className="w-5 h-5" />,
-      Kontak: <Phone className="w-5 h-5" />,
-      "Nama Toko": <Building className="w-5 h-5" />,
-      Peran: <Shield className="w-5 h-5" />,
+      "Employee ID": <Hash className="w-5 h-5" />,
+      Name: <User className="w-5 h-5" />,
+      Address: <MapPin className="w-5 h-5" />,
+      Contact: <Phone className="w-5 h-5" />,
+      "Store Name": <Building className="w-5 h-5" />,
+      Role: <Shield className="w-5 h-5" />,
     };
     return iconMap[label] || <User className="w-5 h-5" />;
   };
@@ -54,21 +83,21 @@ export default function Dashboard() {
       <div className="font-poppins">
         <h1 className="text-3xl font-bold text-[#2B5658]">Dashboard</h1>
         <p className="text-gray-600 mt-2">
-          Selamat Datang Kembali, {employee?.employeeName || "Guest"}
+          Welcome back, {employee?.employeeName || "Guest"}
         </p>
       </div>
 
       <Stats />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Informasi Pegawai */}
+        {/* Employee Info */}
         <div className="bg-white rounded-2xl p-6 shadow-sm h-fit">
           <div className="flex items-center mb-6">
             <div className="w-10 h-10 rounded-full bg-gradient-to-r from-[#3F7F83] to-[#2B5658] flex items-center justify-center">
               <User className="w-5 h-5 text-white" />
             </div>
             <h2 className="text-xl font-semibold text-[#3F7F83] ml-4">
-              Informasi Pegawai
+              Employee Information
             </h2>
           </div>
 
@@ -76,18 +105,18 @@ export default function Dashboard() {
             <div className="flex items-center justify-center py-10">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3F7F83]" />
               <p className="text-gray-500 text-sm ml-4">
-                Memuat data pegawai...
+                Loading employee data...
               </p>
             </div>
           ) : employee ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
               {[
-                { label: "ID Pegawai", value: employee.employeeId },
-                { label: "Nama", value: employee.employeeName },
-                { label: "Alamat", value: employee.address },
-                { label: "Kontak", value: employee.contact },
-                { label: "Nama Toko", value: employee.storename },
-                { label: "Peran", value: employee.role },
+                { label: "Employee ID", value: employee.employeeId },
+                { label: "Name", value: employee.employeeName },
+                { label: "Address", value: employee.address },
+                { label: "Contact", value: employee.contact },
+                { label: "Store Name", value: employee.storename },
+                { label: "Role", value: employee.role },
               ].map(({ label, value }) => (
                 <div
                   key={label}
@@ -101,11 +130,11 @@ export default function Dashboard() {
                       {label}
                     </p>
                     <p className="text-sm font-medium text-gray-900 break-words">
-                      {label === "Peran" && value === "Employee"
-                        ? "Karyawan Toko"
+                      {label === "Role" && value === "Employee"
+                        ? "Store Staff"
                         : value || (
                             <span className="text-gray-400 italic">
-                              Tidak tersedia
+                              Not available
                             </span>
                           )}
                     </p>
@@ -119,9 +148,9 @@ export default function Dashboard() {
                 <User className="w-6 h-6 text-red-500" />
               </div>
               <p className="text-red-500 text-sm font-medium">
-                Gagal memuat data pegawai
+                Failed to load employee data
               </p>
-              <p className="text-gray-400 text-xs">Silakan coba lagi nanti</p>
+              <p className="text-gray-400 text-xs">Please try again later</p>
             </div>
           )}
         </div>
@@ -133,13 +162,30 @@ export default function Dashboard() {
           </h2>
           <div className="grid grid-cols-2 gap-4">
             {[
-              { label: "Transaksi Baru", icon: <Plus /> },
-              { label: "Data Produk", icon: <Database /> },
-              { label: "Data Penjualan", icon: <ChartBar /> },
-              { label: "Absensi", icon: <Clock /> },
-            ].map(({ label, icon }) => (
+              {
+                label: "New Transaction",
+                icon: <Plus />,
+                route: "/employee/transactions/sales",
+              },
+              {
+                label: "Product Data",
+                icon: <Database />,
+                route: "/employee/products/list",
+              },
+              {
+                label: "Sales Data",
+                icon: <ChartBar />,
+                route: "/employee/transactions/list",
+              },
+              {
+                label: "Attendance",
+                icon: <Clock />,
+                route: "/employee/attendance/list",
+              },
+            ].map(({ label, icon, route }) => (
               <button
                 key={label}
+                onClick={() => router.push(route)}
                 className="p-4 bg-gray-50 rounded-lg text-left hover:bg-gray-100 transition-colors"
               >
                 <div className="w-8 h-8 rounded-full bg-[#3F7F83] flex items-center justify-center text-white mb-2">

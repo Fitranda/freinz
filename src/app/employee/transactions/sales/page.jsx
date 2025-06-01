@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { fetchProducts } from "@/services/product";
 import { createSale } from "@/services/sale";
 import { fetchEmployeeById } from "@/services/employee";
+import { jwtDecode } from "jwt-decode";
 import toast from "react-hot-toast";
 
 export default function KeranjangPenjualan() {
@@ -12,8 +13,10 @@ export default function KeranjangPenjualan() {
   const [searchInput, setSearchInput] = useState("");
   const [cartItems, setCartItems] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState("cash");
-  const [discountPercentage, setDiscountPercentage] = useState(0);
-  const [payment, setPayment] = useState(0);
+  const [discountPercentage, setDiscountPercentage] = useState("");
+  const [payment, setPayment] = useState("");
+  const [qrisImage, setQrisImage] = useState(null);
+  const [qrisImagePreview, setQrisImagePreview] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentEmployee, setCurrentEmployee] = useState(null);
 
@@ -27,8 +30,23 @@ export default function KeranjangPenjualan() {
         // Load current employee dari token
         const token = localStorage.getItem("token");
         if (token) {
-          const employee = await fetchEmployeeById(token);
-          setCurrentEmployee(employee);
+          const decoded = jwtDecode(token);
+          const employeeId = decoded.employeeId || decoded.id;
+
+          if (!employeeId) {
+            setError("Employee ID not found in token");
+            setLoading(false);
+            return;
+          }
+
+          // Fetch employee data with correct parameters
+          const data = await fetchEmployeeById(employeeId, token);
+
+          if (data) {
+            setCurrentEmployee(data);
+          } else {
+            toast.error("Gagal memuat data");
+          }
         }
       } catch (error) {
         console.error("Error loading data:", error);
@@ -88,34 +106,71 @@ export default function KeranjangPenjualan() {
 
   const handleResetCart = () => {
     setCartItems([]);
-    setDiscountPercentage(0);
-    setPayment(0);
+    setDiscountPercentage("");
+    setPayment("");
+    setQrisImage(null);
+    setQrisImagePreview(null);
   };
 
   const subTotal = cartItems.reduce((sum, item) => sum + item.total, 0);
   const validDiscountPercentage = Math.max(
     0,
-    Math.min(100, discountPercentage)
+    Math.min(100, Number(discountPercentage) || 0)
   );
   const discountAmount = (subTotal * validDiscountPercentage) / 100;
   const totalAfterDiscount = subTotal - discountAmount;
+  const paymentAmount = Number(payment) || 0;
   const change =
-    payment >= totalAfterDiscount ? payment - totalAfterDiscount : 0;
+    paymentAmount >= totalAfterDiscount
+      ? paymentAmount - totalAfterDiscount
+      : 0;
 
   const handleDiscountChange = (e) => {
     const value = e.target.value;
-    const num = Number(value);
-    if (!isNaN(num)) {
-      setDiscountPercentage(num);
+    if (
+      value === "" ||
+      (!isNaN(Number(value)) && Number(value) >= 0 && Number(value) <= 100)
+    ) {
+      setDiscountPercentage(value);
     }
   };
 
   const handlePaymentChange = (e) => {
     const value = e.target.value;
-    const num = Number(value);
-    if (!isNaN(num)) {
-      setPayment(num);
+    if (value === "" || (!isNaN(Number(value)) && Number(value) >= 0)) {
+      setPayment(value);
     }
+  };
+
+  const handleQrisImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        toast.error("File harus berupa gambar!");
+        return;
+      }
+
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("Ukuran file maksimal 5MB!");
+        return;
+      }
+
+      setQrisImage(file);
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setQrisImagePreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveQrisImage = () => {
+    setQrisImage(null);
+    setQrisImagePreview(null);
   };
 
   // Generate invoice number
@@ -130,9 +185,7 @@ export default function KeranjangPenjualan() {
     return `INV${timestamp}`;
   };
 
-  // Handle submit transaksi
   const handleSubmitSale = async () => {
-    // Validasi basic
     if (cartItems.length === 0) {
       toast.error("Keranjang masih kosong!");
       return;
@@ -143,24 +196,28 @@ export default function KeranjangPenjualan() {
       return;
     }
 
-    if (payment < totalAfterDiscount) {
+    if (paymentAmount < totalAfterDiscount) {
       toast.error("Pembayaran kurang!");
+      return;
+    }
+
+    if (paymentMethod === "qris" && !qrisImage) {
+      toast.error("Harap upload bukti pembayaran QRIS!");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      // Format data sesuai API
       const saleData = {
         invoice: generateInvoice(),
         employeeId: currentEmployee.employeeId,
-        date: new Date().toISOString().split("T")[0], // YYYY-MM-DD format
+        date: new Date().toISOString().split("T")[0], // YYYY-MM-DD
         method: paymentMethod,
         subtotal: subTotal,
         discountPercent: validDiscountPercentage,
         total: totalAfterDiscount,
-        payment: payment,
+        payment: paymentAmount,
         change: change,
         details: cartItems.map((item) => ({
           productId: item.id,
@@ -170,20 +227,17 @@ export default function KeranjangPenjualan() {
         })),
       };
 
-      console.log("Sending sale data:", saleData);
+      // Pass the image file only if payment method is QRIS
+      const proofQris = paymentMethod === "qris" ? qrisImage : null;
 
-      const result = await createSale(saleData);
+      const result = await createSale(saleData, proofQris);
 
       if (result) {
         toast.success("Transaksi berhasil disimpan!");
-        console.log("Sale created:", result);
-
-        // Reset form setelah berhasil
         handleResetCart();
         setSearchInput("");
         setSearchResults([]);
-
-        // Optional: redirect atau print receipt
+        // Optional: redirect or print receipt
         // router.push(`/receipt/${result.id}`);
       } else {
         throw new Error("Gagal menyimpan transaksi");
@@ -330,7 +384,11 @@ export default function KeranjangPenjualan() {
                 name="paymentMethod"
                 value="cash"
                 checked={paymentMethod === "cash"}
-                onChange={() => setPaymentMethod("cash")}
+                onChange={() => {
+                  setPaymentMethod("cash");
+                  setQrisImage(null);
+                  setQrisImagePreview(null);
+                }}
                 className="mr-1"
               />
               Cash
@@ -348,6 +406,74 @@ export default function KeranjangPenjualan() {
             </label>
           </div>
 
+          {/* QRIS Image Upload Section */}
+          {paymentMethod === "qris" && (
+            <div className="mb-4 p-4 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+              <h3 className="font-semibold mb-2 text-gray-700">
+                Upload Bukti Pembayaran QRIS
+              </h3>
+
+              {!qrisImagePreview ? (
+                <div className="text-center">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleQrisImageChange}
+                    className="hidden"
+                    id="qris-upload"
+                  />
+                  <label
+                    htmlFor="qris-upload"
+                    className="cursor-pointer inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <svg
+                      className="w-5 h-5 mr-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                      />
+                    </svg>
+                    Pilih Gambar
+                  </label>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Format: JPG, PNG, GIF (Max: 5MB)
+                  </p>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <div className="relative inline-block">
+                    <img
+                      src={qrisImagePreview}
+                      alt="QRIS Payment Proof"
+                      className="max-w-xs max-h-48 object-contain border rounded"
+                    />
+                    <button
+                      onClick={handleRemoveQrisImage}
+                      className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-700 text-sm"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <p className="text-sm text-green-600 mt-2">
+                    ✓ Gambar berhasil diupload
+                  </p>
+                  <button
+                    onClick={handleRemoveQrisImage}
+                    className="mt-2 text-blue-600 hover:text-blue-800 text-sm underline"
+                  >
+                    Ganti Gambar
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4 text-sm mb-4">
             <div>
               <div className="mb-2 flex items-center">
@@ -358,6 +484,7 @@ export default function KeranjangPenjualan() {
                   onChange={handleDiscountChange}
                   min={0}
                   max={100}
+                  placeholder="0"
                   className="flex-1 border border-gray-300 p-2"
                 />
               </div>
@@ -388,6 +515,7 @@ export default function KeranjangPenjualan() {
                   value={payment}
                   onChange={handlePaymentChange}
                   min={0}
+                  placeholder="0"
                   className="flex-1 border border-gray-300 p-2"
                 />
               </div>
@@ -410,12 +538,14 @@ export default function KeranjangPenjualan() {
               disabled={
                 isSubmitting ||
                 cartItems.length === 0 ||
-                payment < totalAfterDiscount
+                paymentAmount < totalAfterDiscount ||
+                (paymentMethod === "qris" && !qrisImage)
               }
               className={`px-6 py-3 rounded font-semibold text-white ${
                 isSubmitting ||
                 cartItems.length === 0 ||
-                payment < totalAfterDiscount
+                paymentAmount < totalAfterDiscount ||
+                (paymentMethod === "qris" && !qrisImage)
                   ? "bg-gray-400 cursor-not-allowed"
                   : "bg-green-600 hover:bg-green-700"
               }`}
@@ -429,15 +559,20 @@ export default function KeranjangPenjualan() {
             {cartItems.length === 0 && (
               <p className="text-red-500">• Tambahkan produk ke keranjang</p>
             )}
-            {payment < totalAfterDiscount && payment > 0 && (
+            {paymentAmount < totalAfterDiscount && paymentAmount > 0 && (
               <p className="text-red-500">
                 • Pembayaran kurang Rp{" "}
-                {(totalAfterDiscount - payment).toLocaleString()}
+                {(totalAfterDiscount - paymentAmount).toLocaleString()}
               </p>
             )}
-            {payment >= totalAfterDiscount && cartItems.length > 0 && (
-              <p className="text-green-600">• Siap untuk disimpan</p>
+            {paymentMethod === "qris" && !qrisImage && (
+              <p className="text-red-500">• Upload bukti pembayaran QRIS</p>
             )}
+            {paymentAmount >= totalAfterDiscount &&
+              cartItems.length > 0 &&
+              (paymentMethod !== "qris" || qrisImage) && (
+                <p className="text-green-600">• Siap untuk disimpan</p>
+              )}
           </div>
         </div>
       </div>

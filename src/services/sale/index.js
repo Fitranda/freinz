@@ -64,9 +64,30 @@ export async function fetchSaleDetail(saleId) {
   }
 }
 
-export async function createSale(saleData) {
+export async function createSale(saleData, proofFile) {
   try {
     const token = localStorage.getItem("token");
+
+    const formData = new FormData();
+
+    // Append text fields
+    formData.append("invoice", saleData.invoice);
+    formData.append("employeeId", saleData.employeeId);
+    formData.append("date", saleData.date);
+    formData.append("method", saleData.method);
+    formData.append("subtotal", saleData.subtotal);
+    formData.append("discountPercent", saleData.discountPercent);
+    formData.append("total", saleData.total);
+    formData.append("payment", saleData.payment);
+    formData.append("change", saleData.change);
+
+    // Append details as JSON string
+    formData.append("details", JSON.stringify(saleData.details));
+
+    // Append proof image file (optional)
+    if (proofFile) {
+      formData.append("proofQris", proofFile);
+    }
 
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/sale`,
@@ -74,9 +95,9 @@ export async function createSale(saleData) {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+          // Don't set Content-Type here!
         },
-        body: JSON.stringify(saleData),
+        body: formData,
       }
     );
 
