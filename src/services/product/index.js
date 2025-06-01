@@ -61,9 +61,6 @@ export async function updateProduct(productId, product) {
   try {
     const token = localStorage.getItem("token");
 
-    console.log("Updating product:", productId);
-    console.log("With data:", product);
-
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/product/${productId}`,
       {

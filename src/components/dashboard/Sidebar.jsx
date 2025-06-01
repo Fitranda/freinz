@@ -13,17 +13,17 @@ export default function Sidebar({ isOpen }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const navigationByRole = {    Employee: [
+  const navigationByRole = {
+    Employee: [
       { name: "Dashboard", icon: "home", href: "/employee/dashboard" },
       { name: "Absensi", icon: "users", href: "/employee/attendance/list" },
       {
         name: "Barang",
         icon: "report",
-        children: [
-          { name: "Data Barang", href: "/employee/products/list" },
-          { name: "Pesan Barang", href: "/employee/products/order/list" },
-        ],
-      },      {
+        name: "Data Barang",
+        href: "/employee/products/list",
+      },
+      {
         name: "Purchase Order",
         icon: "shopping-cart",
         children: [
@@ -45,10 +45,8 @@ export default function Sidebar({ isOpen }) {
       {
         name: "Barang",
         icon: "report",
-        children: [
-          { name: "Data Barang", href: "/admin/products/list" },
-          { name: "Pesan Barang", href: "/admin/products/order/list" },
-        ],
+        name: "Data Barang",
+        href: "/admin/products/list",
       },
       { name: "Transaksi", icon: "settings", href: "/admin/transactions/list" },
       {
@@ -56,15 +54,14 @@ export default function Sidebar({ isOpen }) {
         icon: "building-store",
         href: "/admin/suppliers/list",
       },
-    ],    Supervisor: [
+    ],
+    Supervisor: [
       { name: "Dashboard", icon: "home", href: "/supervisor/dashboard" },
       {
         name: "Barang",
         icon: "report",
-        children: [
-          { name: "Data Barang", href: "/supervisor/products/list" },
-          { name: "Pesan Barang", href: "/supervisor/products/order/list" },
-        ],
+        name: "Data Barang",
+        href: "/supervisor/products/list",
       },
       {
         name: "Purchase Order",
@@ -93,9 +90,11 @@ export default function Sidebar({ isOpen }) {
         // Try to get cached role first for faster loading
         const cachedRole = localStorage.getItem("userRole");
         const cachedUserData = localStorage.getItem("userData");
-        
+
         if (cachedRole && cachedUserData) {
-          const normalizedRole = cachedRole.charAt(0).toUpperCase() + cachedRole.slice(1).toLowerCase();
+          const normalizedRole =
+            cachedRole.charAt(0).toUpperCase() +
+            cachedRole.slice(1).toLowerCase();
           setRole(normalizedRole);
           setLoading(false);
           return; // Use cached data, skip API call
@@ -130,7 +129,7 @@ export default function Sidebar({ isOpen }) {
           employee.role?.charAt(0).toUpperCase() +
           employee.role?.slice(1).toLowerCase();
         setRole(normalizedRole);
-        
+
         // Cache the role and user data for faster future loads
         localStorage.setItem("userRole", employee.role?.toLowerCase());
         localStorage.setItem("userData", JSON.stringify(employee));

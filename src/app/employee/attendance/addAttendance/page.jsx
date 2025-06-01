@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { jwtDecode } from "jwt-decode";
 import { fetchEmployeeById } from "@/services/employee"; // adjust path if needed
 import { createAttendance } from "@/services/attendance"; // adjust path if needed
 
@@ -22,18 +23,28 @@ export default function AddAttendance() {
     const fetchData = async () => {
       const token = localStorage.getItem("token");
       if (!token) {
-        toast.error("User not authenticated");
-        router.push("/login");
+        setError("No authentication token found");
+        setLoading(false);
         return;
       }
 
-      const emp = await fetchEmployeeById(token);
-      if (!emp) {
-        toast.error("Failed to fetch employee data");
-        router.push("/");
+      const decoded = jwtDecode(token);
+      const employeeId = decoded.employeeId || decoded.id;
+
+      if (!employeeId) {
+        setError("Employee ID not found in token");
+        setLoading(false);
         return;
       }
-      setEmployeeData(emp);
+
+      const employee = await fetchEmployeeById(employeeId, token);
+
+      if (!employee) {
+        setError("Failed to fetch employee data");
+        setLoading(false);
+        return;
+      }
+      setEmployeeData(employee);
       setLoading(false);
     };
 

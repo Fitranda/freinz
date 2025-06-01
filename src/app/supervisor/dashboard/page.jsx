@@ -128,7 +128,7 @@ export default function Dashboard() {
             )}
           </p>
         </div>
-        <div>
+        {/*<div>
           <label
             htmlFor="branch"
             className="block text-sm font-medium text-gray-700 mb-1"
@@ -147,7 +147,7 @@ export default function Dashboard() {
             <option value="sukolilo">Cabang Sukolilo</option>
             <option value="manyar">Cabang Manyar</option>
           </select>
-        </div>
+        </div>*/}
       </div>
 
       <Stats />

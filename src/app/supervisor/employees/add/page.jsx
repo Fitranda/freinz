@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "react-hot-toast";
+import { createEmployee } from "@/services/employee";
 
 export default function AddEmployee() {
   const [form, setForm] = useState({
@@ -10,10 +13,12 @@ export default function AddEmployee() {
     username: "",
     password: "",
     contact: "",
+    address: "",
   });
 
   const [profilePictureFile, setProfilePictureFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
+  const router = useRouter();
 
   const handleChange = (e) => {
     setForm({
@@ -37,10 +42,10 @@ export default function AddEmployee() {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Build FormData for picture upload
+    // Build FormData
     const formData = new FormData();
     formData.append("employeeName", form.name);
     formData.append("role", form.role);
@@ -48,18 +53,20 @@ export default function AddEmployee() {
     formData.append("username", form.username);
     formData.append("password", form.password);
     formData.append("contact", form.contact);
+    formData.append("address", form.address);
 
     if (profilePictureFile) {
       formData.append("profilePicture", profilePictureFile);
     }
 
-    // TODO: Replace console.log with actual API call to create employee
-    console.log("Submitting employee data:", form);
-    if (profilePictureFile) {
-      console.log("Uploading file:", profilePictureFile.name);
+    try {
+      const newEmployee = await createEmployee(formData);
+      toast.success("Karyawan berhasil ditambahkan!");
+      router.push("/supervisor/employees/list");
+      console.log("Created employee:", newEmployee);
+    } catch (error) {
+      toast.error("Gagal menambahkan karyawan: " + error.message);
     }
-
-    alert("Employee data submitted! Check console.");
   };
 
   return (
@@ -158,6 +165,20 @@ export default function AddEmployee() {
             value={form.contact}
             onChange={handleChange}
             placeholder="Masukkan Kontak"
+            className="w-full px-4 py-3 border-2 border-[#3F7F83] rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-400 transition text-gray-800"
+            required
+          />
+        </div>
+
+        {/* Address */}
+        <div className="space-y-2 md:col-span-1">
+          <label className="block text-gray-800 font-medium">Alamat</label>
+          <input
+            name="address"
+            type="text"
+            value={form.address}
+            onChange={handleChange}
+            placeholder="Masukkan Alamat"
             className="w-full px-4 py-3 border-2 border-[#3F7F83] rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-400 transition text-gray-800"
             required
           />
