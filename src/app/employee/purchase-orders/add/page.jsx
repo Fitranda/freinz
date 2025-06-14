@@ -37,7 +37,6 @@ export default function AddPurchaseOrderPage() {
     const loadProducts = async () => {
       try {
         const data = await fetchProducts(token);
-        console.log("Fetched products:", data);
 
         setProducts(data);
       } catch (error) {

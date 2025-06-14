@@ -1,115 +1,122 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import Image from "next/image";
+import { useSelector } from "react-redux";
+import toast from "react-hot-toast";
 
-export default function EmployeeDetailPage() {
+export default function SupplierDetailPage() {
   const { id } = useParams();
-  const [employee, setEmployee] = useState(null);
-  const [attendances, setAttendances] = useState([]);
+  const router = useRouter();
+  const { token } = useSelector((state) => state.auth);
+  const [supplier, setSupplier] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Mock data for demonstration
-    const mockEmployee = {
-      id: "EMP001",
-      name: "Indra Gunawan",
-      address: "Jl. Mawar No. 10",
-      contact: "08123456789",
-      username: "indrag",
-      password: "********",
-      salary: "5.000.000",
-      role: "Karyawan Toko",
-      storename: "Frenz Rungkut",
-      status: "Aktif",
+    const fetchSupplier = async () => {
+      try {
+        const response = await fetch(`/api/suppliers/${id}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Supplier tidak ditemukan");
+        }
+
+        const data = await response.json();
+        setSupplier(data);
+      } catch (error) {
+        console.error("Error fetching supplier:", error);
+        toast.error("Gagal memuat detail supplier: " + error.message);
+        router.push("/admin/suppliers/list");
+      } finally {
+        setLoading(false);
+      }
     };
 
-    const mockAttendance = [
-      {
-        attendanceid: "ATT001",
-        employeeid: "EMP001",
-        date: "2025-05-10",
-        time: "08:05",
-        photo: "/photos/att001.jpg",
-        latitude: "-7.2575",
-        longitude: "112.7521",
-        status: "Hadir",
-      },
-      {
-        attendanceid: "ATT002",
-        employeeid: "EMP001",
-        date: "2025-05-09",
-        time: "08:07",
-        photo: "/photos/att002.jpg",
-        latitude: "-7.2574",
-        longitude: "112.7519",
-        status: "Tidak Hadir",
-      },
-    ];
+    if (token && id) {
+      fetchSupplier();
+    }  }, [token, id]);
 
-    setEmployee(mockEmployee);
-    setAttendances(mockAttendance);
-  }, [id]);
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-500">Loading supplier details...</div>
+      </div>
+    );
+  }
 
-  if (!employee) return <div>Loading...</div>;
+  if (!supplier) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-500">Supplier tidak ditemukan</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 text-gray-800">
-      <h1 className="text-3xl font-bold text-[#2B5658]">Detail Karyawan</h1>
-
-      <div className="grid grid-cols-2 gap-4 bg-white p-6 rounded-xl shadow">
-        {Object.entries(employee).map(([key, value]) => (
-          <div key={key}>
-            <p className="font-semibold capitalize">{key}</p>
-            <p>{value}</p>
-          </div>
-        ))}
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-[#2B5658]">Detail Supplier</h1>
+        <div className="flex space-x-2">
+          <button
+            onClick={() => router.push(`/admin/suppliers/edit/${supplier.id}`)}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+          >
+            Edit Supplier
+          </button>
+          <button
+            onClick={() => router.push("/admin/suppliers/list")}
+            className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition"
+          >
+            Kembali
+          </button>
+        </div>
       </div>
 
-      <div>
-        <h2 className="text-2xl font-semibold text-[#2B5658] mb-4">
-          Riwayat Absensi
-        </h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full table-auto bg-white rounded-2xl shadow text-sm text-gray-800">
-            <thead>
-              <tr className="bg-[#3F7F83] text-white">
-                <th className="px-4 py-2">ID</th>
-                <th className="px-4 py-2">Tanggal</th>
-                <th className="px-4 py-2">Waktu</th>
-                <th className="px-4 py-2">Foto</th>
-                <th className="px-4 py-2">Latitude</th>
-                <th className="px-4 py-2">Longitude</th>
-                <th className="px-4 py-2">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {attendances.map((att) => (
-                <tr
-                  key={att.attendanceid}
-                  className="border-b hover:bg-gray-100"
-                >
-                  <td className="px-4 py-2">{att.attendanceid}</td>
-                  <td className="px-4 py-2">{att.date}</td>
-                  <td className="px-4 py-2">{att.time}</td>
-                  <td className="px-4 py-2">
-                    <a
-                      href={att.photo}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 underline hover:text-blue-800 transition"
-                    >
-                      View Photo
-                    </a>
-                  </td>
-                  <td className="px-4 py-2">{att.latitude}</td>
-                  <td className="px-4 py-2">{att.longitude}</td>
-                  <td className="px-4 py-2">{att.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="bg-white p-6 rounded-xl shadow">
+        <h2 className="text-xl font-semibold text-[#2B5658] mb-4">Informasi Supplier</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-600">ID Supplier</label>
+              <p className="text-gray-800 font-medium">{supplier.id}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-600">Nama Supplier</label>
+              <p className="text-gray-800 font-medium">{supplier.name}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-600">Kontak</label>
+              <p className="text-gray-800">{supplier.contact || "-"}</p>
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-600">Email</label>
+              <p className="text-gray-800">{supplier.email || "-"}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-600">Alamat</label>
+              <p className="text-gray-800">{supplier.address || "-"}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-600">Tanggal Dibuat</label>
+              <p className="text-gray-800">
+                {supplier.createdAt ? new Date(supplier.createdAt).toLocaleDateString('id-ID') : "-"}
+              </p>
+            </div>
+          </div>
         </div>
+        {supplier.description && (
+          <div className="mt-6">
+            <label className="block text-sm font-medium text-gray-600 mb-2">Deskripsi</label>
+            <p className="text-gray-800 bg-gray-50 p-4 rounded-lg">{supplier.description}</p>
+          </div>
+        )}
       </div>
     </div>
   );

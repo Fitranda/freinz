@@ -50,6 +50,11 @@ export default function Sidebar({ isOpen }) {
       },
       { name: "Transaksi", icon: "settings", href: "/admin/transactions/list" },
       {
+        name: "Purchase Order",
+        icon: "shopping-cart",
+        href: "/admin/purchase-orders/list",
+      },
+      {
         name: "Supplier",
         icon: "building-store",
         href: "/admin/suppliers/list",
@@ -63,11 +68,11 @@ export default function Sidebar({ isOpen }) {
         name: "Data Barang",
         href: "/supervisor/products/list",
       },
-      {
-        name: "Purchase Order",
-        icon: "shopping-cart",
-        href: "/supervisor/purchase-orders/list",
-      },
+      // {
+      //   name: "Purchase Order",
+      //   icon: "shopping-cart",
+      //   href: "/supervisor/purchase-orders/list",
+      // },
       {
         name: "Transaksi",
         icon: "settings",

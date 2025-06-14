@@ -161,11 +161,11 @@ export default function SalesDetail() {
                 <p className="text-lg opacity-90">#{saleData.invoice}</p>
               </div>
               <div className="text-right">
-                <h2 className="text-2xl font-bold">TOKO ANDA</h2>
+                <h2 className="text-2xl font-bold">FRENZ BENDUL MERISI</h2>
                 <p className="mt-2 opacity-90">
-                  Jl. Contoh Alamat No. 123
+                  Jl. Bendul Merisi No.148, Sidosermo 
                   <br />
-                  Jakarta Pusat, 10110
+                  Kec. Wonocolo, Surabaya, Jawa Timur 60239
                   <br />
                   Telp: (021) 123-4567
                 </p>
