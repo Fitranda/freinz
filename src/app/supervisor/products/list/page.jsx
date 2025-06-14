@@ -76,9 +76,9 @@ export default function Products() {
     const doc = new jsPDF();
 
     doc.setFontSize(14);
-    doc.text("PT Hadi Teknik", 14, 15);
+    doc.text("FRENZ BENDUL MERISI", 14, 15);
     doc.setFontSize(10);
-    doc.text("Jl. Contoh Alamat No.123, Jakarta", 14, 21);
+    doc.text("Jl. Bendul Merisi No.148, Sidosermo, Kec. Wonocolo, Surabaya, Jawa Timur 60239", 14, 21);
     doc.text(
       `Tanggal Export: ${new Date().toLocaleDateString("id-ID")}`,
       14,
