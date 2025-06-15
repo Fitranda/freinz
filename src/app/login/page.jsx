@@ -1,71 +1,165 @@
 "use client";
 
 import { useState } from "react";
+import { useDispatch } from "react-redux";
+import { setToken, setUser } from "@/redux/slices/auth";
+import { login } from "@/services/auth/index";
+import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
+import { useSplash } from "@/providers/SplashProvider";
 
 export default function LoginPage() {
-  const [formData, setFormData] = useState({
-    userId: "",
-    password: "",
-  });
+  const [formData, setFormData] = useState({ username: "", password: "" });
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const dispatch = useDispatch();
+  const router = useRouter();
+  const { showSplashScreen } = useSplash();
+
+  const handleSubmit = async (e) => {    
     e.preventDefault();
-    // Handle login logic here
+
+    if (!formData.username.trim() || !formData.password.trim()) {
+      toast.error("Username and password must be filled.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const data = await login({
+        username: formData.username,
+        password: formData.password,
+      });
+
+      dispatch(setToken(data.token));
+      dispatch(setUser(data.employee));      toast.success("Login successful!");      const role = data.employee.role?.toLowerCase();
+
+      // Mark that user came from login
+      sessionStorage.setItem("fromLogin", "true");
+
+      // Determine target route
+      let targetRoute = "/employee/dashboard"; // default
+      if (role === "employee") {
+        targetRoute = "/employee/dashboard";
+      } else if (role === "admin") {
+        targetRoute = "/admin/dashboard";
+      } else if (role === "supervisor") {
+        targetRoute = "/supervisor/dashboard";
+      } else {
+        toast.error("Unrecognized role. Please contact the administrator.");
+        return;
+      }      // Store user data in localStorage immediately for faster dashboard loading
+      localStorage.setItem("userRole", role);
+      localStorage.setItem("userData", JSON.stringify(data.employee));
+
+      // Show splash screen first
+      showSplashScreen();
+      
+      // Immediate navigation for supervisor role - bypass timing issues
+      if (role === "supervisor") {
+        setTimeout(() => {
+          router.push(targetRoute);
+        }, 100); // Slightly longer for supervisor to ensure state is set
+      } else {
+        setTimeout(() => {
+          router.push(targetRoute);
+        }, 50); // Faster for other roles
+      }
+
+      // Fallback navigation in case splash screen takes too long
+      setTimeout(() => {
+        router.push(targetRoute);
+      }, 2000); // Longer fallback for more reliable navigation
+    } catch (error) {
+      toast.error(
+        "Login failed: " + (error?.response?.data?.message || error.message)
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="w-full h-screen flex relative overflow-hidden bg-white">
-      <div className="absolute w-full h-full overflow-hidden">
-        <div className="absolute rounded-full bg-gradient-to-b from-[#3F7F83] to-[#2B5658] w-[941px] h-[794px] -left-[225px] -top-[117px]" />
-        <div className="absolute rounded-full bg-gradient-to-b from-[#3F7F83] to-[#2B5658] w-[398px] h-[349px] -left-[77px] top-[553px]" />
-        <div className="absolute rounded-full bg-gradient-to-b from-[#3F7F83] to-[#2B5658] w-[283px] h-[248px] left-[419px] top-[454px]" />
+      {/* Background Decorations */}
+      <div className="hidden lg:block absolute w-full h-full overflow-hidden">
+        {[
+          {
+            className: "w-[941px] h-[800px] -left-[225px] -top-[117px]",
+          },
+          {
+            className: "w-[398px] h-[400px] -left-[77px] top-[553px]",
+          },
+          {
+            className: "w-[283px] h-[280px] left-[419px] top-[454px]",
+          },
+        ].map((style, idx) => (
+          <div
+            key={idx}
+            className={`absolute rounded-full ${style.className}`}
+            style={{
+              backgroundImage:
+                "linear-gradient(to bottom, #0E1C1D 0%, #264E50 38%, #336669 56%, #3F7F82 75%)",
+            }}
+          />
+        ))}
+        <div className="absolute left-[50px] top-[20px]">
+          <img
+            src="/images/frenzLogo.png"
+            alt="Frenz logo"
+            className="rounded-full w-[600px] h-[600px]"
+          />
+        </div>
       </div>
 
+      {/* Login Form */}
       <div className="flex w-full max-w-[1280px] mx-auto p-5 relative z-[1] lg:flex-row flex-col items-center lg:p-10">
-        <div className="font-poppins text-[48px] font-bold text-[#3F7F83] lg:mt-[100px] lg:ml-[100px] mt-5 uppercase tracking-[2px] text-center lg:text-left">
-          <span>Frenz</span>
-          <div className="text-[24px] -mt-[10px] text-[#2B5658]">Indonesia</div>
-        </div>
-
-        <div className="lg:ml-auto p-10 w-full max-w-[472px] lg:w-[472px]">
-          <div className="font-poppins text-[53px] font-bold text-black mb-10 sm:text-[53px] text-[36px] text-center sm:text-left">
-            Selamat Datang!
+        <div className="lg:ml-auto p-10 w-full max-w-[472px] shadow-2xl rounded-[20px] bg-white">
+          <div className="font-poppins text-[48px] font-bold text-black mb-5 text-center sm:text-left">
+            Welcome!
           </div>
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-[50px]">
-            <div className="relative rounded-[20px] p-5 h-[76px] flex items-center bg-[#D9D9D9] sm:h-[76px] h-[60px]">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-[20px]">
+            {/* Username */}
+            <div className="relative rounded-[20px] p-5 h-[76px] flex items-center bg-[#D9D9D9]">
               <i className="ti ti-user text-[24px] text-black mr-5" />
               <input
                 type="text"
-                placeholder="Nomor Id"
-                value={formData.userId}
+                placeholder="Username"
+                value={formData.username}
                 onChange={(e) =>
-                  setFormData({ ...formData, userId: e.target.value })
+                  setFormData({ ...formData, username: e.target.value })
                 }
-                className="bg-transparent border-none font-poppins text-[24px] font-light text-black w-full sm:text-[24px] text-[18px] focus:outline-none"
+                className="bg-transparent border-none font-poppins text-[24px] font-light text-black w-full focus:outline-none"
+                autoComplete="username"
               />
             </div>
 
-            <div className="relative rounded-[20px] p-5 h-[76px] flex items-center bg-[#D9D9D9] sm:h-[76px] h-[60px]">
+            {/* Password */}
+            <div className="relative rounded-[20px] p-5 h-[76px] flex items-center bg-[#D9D9D9]">
               <i className="ti ti-lock text-[24px] text-black mr-5" />
               <input
                 type="password"
-                placeholder="Kata Sandi"
+                placeholder="Password"
                 value={formData.password}
                 onChange={(e) =>
                   setFormData({ ...formData, password: e.target.value })
                 }
-                className="bg-transparent border-none font-poppins text-[24px] font-light text-black w-full sm:text-[24px] text-[18px] focus:outline-none"
+                className="bg-transparent border-none font-poppins text-[24px] font-light text-black w-full focus:outline-none"
+                autoComplete="current-password"
               />
             </div>
 
-            <div className="h-[1px] my-10 bg-black" />
-
+            {/* Submit */}
             <button
               type="submit"
-              className="w-full h-[76px] rounded-[20px] border-none text-white font-poppins text-[36px] font-bold cursor-pointer bg-[#3F7F83] sm:h-[76px] h-[60px] sm:text-[36px] text-[24px]"
+              disabled={loading}
+              className={`w-full h-[76px] rounded-[20px] text-white font-poppins font-bold mt-[20px] ${
+                loading ? "bg-gray-400 cursor-not-allowed" : "bg-[#3F7F83]"
+              } sm:text-[36px] text-[24px] flex items-center justify-center`}
             >
-              Masuk
+              {loading ? "Processing..." : "Login"}
             </button>
           </form>
         </div>
