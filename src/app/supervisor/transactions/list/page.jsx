@@ -130,7 +130,11 @@ export default function Sales() {
     doc.setFontSize(14);
     doc.text("FRENZ BENDUL MERISI", 14, 15);
     doc.setFontSize(10);
-    doc.text("Jl. Bendul Merisi No.148, Sidosermo, Kec. Wonocolo, Surabaya, Jawa Timur 60239", 14, 21);
+    doc.text(
+      "Jl. Bendul Merisi No.148, Sidosermo, Kec. Wonocolo, Surabaya, Jawa Timur 60239",
+      14,
+      21
+    );
     doc.text(
       `Tanggal Export: ${new Date().toLocaleDateString("id-ID")}`,
       14,
@@ -312,7 +316,7 @@ export default function Sales() {
                 </td>
                 <td className="px-4 py-2 text-center">
                   <Link
-                    href={`/employee/transactions/detail/${transaction.id}`}
+                    href={`/supervisor/transactions/detail/${transaction.id}`}
                   >
                     <button className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition">
                       Detail
