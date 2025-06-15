@@ -5,12 +5,12 @@ import { useSelector } from "react-redux";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import { fetchPurchaseOrders } from "@/services/purchase";
-import { 
-  ChevronRight, 
-  ChevronDown, 
-  Plus, 
-  Search, 
-  ShoppingCart 
+import {
+  ChevronRight,
+  ChevronDown,
+  Plus,
+  Search,
+  ShoppingCart,
 } from "tabler-icons-react";
 
 export default function PurchaseOrderListPage() {
@@ -251,7 +251,8 @@ export default function PurchaseOrderListPage() {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">
           History Purchase Orders
-        </h1>        <Link
+        </h1>{" "}
+        <Link
           href="/employee/purchase-orders/add"
           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
         >
@@ -265,8 +266,12 @@ export default function PurchaseOrderListPage() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Search
-            </label>            <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            </label>{" "}
+            <div className="relative">
+              <Search
+                size={16}
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+              />
               <input
                 type="text"
                 placeholder="Search by invoice, employee, or product..."
@@ -295,13 +300,15 @@ export default function PurchaseOrderListPage() {
       </div>
       {/* Purchase Orders Table */}
       <div className="bg-white shadow rounded-lg overflow-hidden">
-        {filteredOrders.length === 0 ? (          <div className="text-center py-12">
+        {filteredOrders.length === 0 ? (
+          <div className="text-center py-12">
             <ShoppingCart size={96} className="mx-auto text-gray-300 mb-4" />
             <p className="text-gray-500 mb-4">
               {searchTerm || statusFilter !== "all"
                 ? "No purchase orders found matching your criteria"
                 : "No purchase orders yet"}
-            </p>            <Link
+            </p>{" "}
+            <Link
               href="/employee/purchase-orders/add"
               className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 inline-flex items-center"
             >
@@ -313,7 +320,8 @@ export default function PurchaseOrderListPage() {
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
-                <tr>                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <ChevronRight size={16} />
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -350,7 +358,9 @@ export default function PurchaseOrderListPage() {
                   return (
                     <React.Fragment key={order.purchaseId}>
                       {/* Main Purchase Order Row */}
-                      <tr className="hover:bg-gray-50">                        <td className="px-6 py-4 whitespace-nowrap">
+                      <tr className="hover:bg-gray-50">
+                        {" "}
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <button
                             onClick={() => toggleRowExpansion(order.purchaseId)}
                             className="text-gray-400 hover:text-gray-600 transition-transform duration-200"
